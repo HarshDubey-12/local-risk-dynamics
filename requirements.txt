@@ -1,0 +1,5 @@
+# Python requirements
+pandas
+numpy
+matplotlib
+jupyter
