@@ -21,9 +21,46 @@ The project's central hypothesis is:
 
 > Non-linear financial dynamics can be effectively approximated using collections of locally valid linear models, where locality may be enforced deterministically (distance-based) or stochastically (sampling-based).
 
+## Quick Start
+
+### Installation
+
+```bash
+# Clone repository
+git clone https://github.com/HarshDubey-12/local-risk-dynamics.git
+cd local-risk-dynamics
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Run Experiments
+
+```bash
+# Launch notebook for exploratory data analysis
+jupyter notebook notebooks/01_dataset_exploration.ipynb
+
+# Run baseline global linear model
+jupyter notebook notebooks/02_global_linear_baseline.ipynb
+
+# Run LWLR deterministic locality experiments
+jupyter notebook notebooks/03_lwlr_deterministic.ipynb
+
+# Run Monte Carlo subsampled linear regression
+jupyter notebook notebooks/04_mc_subsampled_linear.ipynb
+
+# Run MCLLR (proposed) stochastic locality model
+jupyter notebook notebooks/05_mcllr_proposed.ipynb
+
+# Compare all model results
+jupyter notebook notebooks/06_results_comparison.ipynb
+```
+
 ## Dataset
 
 We use the **Fama–French Five-Factor dataset**, a canonical benchmark in asset pricing and quantitative finance.
+
+**Data location:** `data/raw/F-F_Research_Data_5_Factors_2x3.csv`
 
 ### Features (risk factors) at time $t$
 
@@ -43,6 +80,30 @@ This formulation ensures:
 - Risk-adjusted interpretation
 - Industry relevance in portfolio and factor modeling
 
+### Data Loading Example
+
+```python
+import pandas as pd
+import numpy as np
+
+# Load Fama-French data
+df = pd.read_csv('data/raw/F-F_Research_Data_5_Factors_2x3.csv', skiprows=3)
+
+# Parse date column
+df['Date'] = pd.to_datetime(df['Date'].astype(str), format='%Y%m%d')
+
+# Convert returns to decimal form (divide by 100)
+factors = ['Mkt-RF', 'SMB', 'HML', 'RMW', 'CMA', 'RF']
+df[factors] = df[factors] / 100
+
+# Prepare features and targets
+X = df[['Mkt-RF', 'SMB', 'HML', 'RMW', 'CMA']].values
+y = df['Mkt-RF'].shift(-1).dropna().values  # next-period market return
+
+print(f"Shape: X={X.shape}, y={y.shape}")
+print(f"Date range: {df['Date'].min()} to {df['Date'].max()}")
+```
+
 ## Model Hierarchy
 
 ### 1. Global Linear Regression — Stationary Baseline
@@ -59,6 +120,20 @@ $$y_t = X_t \beta + \epsilon_t$$
 
 - Provides a stationary benchmark
 - Quantifies mis-specification under regime shifts
+
+**Usage Example**
+
+```python
+from sklearn.linear_model import LinearRegression
+
+# Fit global model
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+# Predict
+y_pred = model.predict(X_test)
+mse = np.mean((y_test - y_pred) ** 2)
+```
 
 ### 2. Locally Weighted Linear Regression (LWLR) — Deterministic Locality
 
@@ -79,6 +154,21 @@ $$w_i(x_0) = \exp\left(-\frac{\|x_i - x_0\|^2}{2\tau^2}\right)$$
 **Interpretation**
 
 Financial factor sensitivities vary smoothly across similar market conditions.
+
+**Usage Example**
+
+```python
+from src.models.lwlr import LocallyWeightedLinearRegression
+
+# Initialize LWLR with bandwidth parameter
+lwlr = LocallyWeightedLinearRegression(bandwidth=1.0)
+
+# Fit on training data
+lwlr.fit(X_train, y_train)
+
+# Predict on test point (query-specific model)
+y_pred = lwlr.predict(X_test)
+```
 
 ### 3. Monte Carlo Subsampled Linear Regression — Stochastic Global Ensemble
 
@@ -101,6 +191,21 @@ Financial factor sensitivities vary smoothly across similar market conditions.
 **Interpretation**
 
 Market behavior is better represented as a distribution of plausible linear regimes rather than a single deterministic fit.
+
+**Usage Example**
+
+```python
+from src.models.mc_linear import MonteCarloLinearRegression
+
+# Initialize with 100 Monte Carlo samples
+mc_model = MonteCarloLinearRegression(n_simulations=100, subsample_size=50)
+
+# Fit ensemble
+mc_model.fit(X_train, y_train)
+
+# Get mean prediction and uncertainty
+y_mean, y_std = mc_model.predict(X_test, return_std=True)
+```
 
 ### 4. Monte Carlo Local Linear Regression (MCLLR) — Stochastic Locality (Proposed)
 
@@ -129,6 +234,68 @@ This produces:
 - Regime-aware predictions
 - Quantified uncertainty
 - Improved stability under non-stationarity
+
+**Usage Example**
+
+```python
+from src.models.mcllr import MonteCarloLocalLinearRegression
+
+# Initialize MCLLR with both locality and stochasticity
+mcllr = MonteCarloLocalLinearRegression(
+    bandwidth=1.0,
+    n_simulations=50,
+    subsample_size=30
+)
+
+# Fit model
+mcllr.fit(X_train, y_train)
+
+# Predict with uncertainty quantification
+y_pred, y_unc = mcllr.predict(X_test, return_uncertainty=True)
+```
+
+## Project Structure
+
+```
+local-risk-dynamics/
+ data/
+    raw/                    # Original Fama-French data
+    processed/              # Preprocessed datasets
+ notebooks/
+    01_dataset_exploration.ipynb
+    02_global_linear_baseline.ipynb
+    03_lwlr_deterministic.ipynb
+    04_mc_subsampled_linear.ipynb
+    05_mcllr_proposed.ipynb
+    06_results_comparison.ipynb
+ src/
+    data/
+       loader.py           # Data loading utilities
+       preprocessing.py    # Preprocessing pipeline
+    models/
+       global_linear.py
+       lwlr.py
+       mc_linear.py
+       mcllr.py
+    optimization/
+       sgd.py
+       closed_form.py
+    evaluation/
+       metrics.py
+       backtesting.py
+    utils/
+        kernels.py
+        sampling.py
+        plotting.py
+ experiments/
+    config_global.yaml
+    config_lwlr.yaml
+    config_mc.yaml
+    config_mcllr.yaml
+ figures/                    # Output plots and results
+ README.md
+ requirements.txt
+```
 
 ## Experimental Goals
 
@@ -189,6 +356,25 @@ Structured research scaffold with planned modular implementation.
 - Deterministic and stochastic locality experiments
 - Full implementation of MCLLR
 - Comparative analysis and industry implications
+
+## Contributing
+
+Contributions are welcome. To contribute:
+
+```bash
+# Create a feature branch
+git checkout -b feature/your-feature-name
+
+# Commit with meaningful messages
+git commit -m "add: descriptive commit message"
+
+# Push and open a pull request
+git push origin feature/your-feature-name
+```
+
+## License
+
+This project is licensed under the MIT License. See LICENSE file for details.
 
 ## Key Takeaway
 
