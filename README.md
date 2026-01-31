@@ -1,42 +1,40 @@
-# Local Risk Dynamics
-**Deterministic vs Stochastic Locality in Linear Models for Financial Risk**
+Local Risk Dynamics
 
-## Overview
+Deterministic vs Stochastic Locality in Linear Models for Financial Risk
 
+Overview
 Financial markets are inherently non-stationary: relationships between risk factors and returns evolve across time, regimes, and uncertainty conditions. Traditional global linear regression assumes constant factor sensitivities, which often leads to model mis-specification in real-world financial environments.
 
 This project studies an alternative paradigm:
 
-> Can complex, regime-dependent financial risk behavior be approximated using ensembles of small, local linear models instead of a single global model?
+Can complex, regime-dependent financial risk behavior be approximated using ensembles of small, local linear models instead of a single global model?
 
-We investigate this question through a structured comparison of four linear modeling philosophies that differ in how they define locality and uncertainty.
+We investigate this through a structured comparison of four linear modeling philosophies that differ in how they define:
 
-## Core Research Idea
+- Locality
+- Uncertainty
 
+Core Research Idea
 All models in this repository lie on a conceptual spectrum:
 
-**Stationary  Deterministic Local  Stochastic Global  Stochastic Local**
+Stationary → Deterministic Local → Stochastic Global → Stochastic Local
 
-The project's central hypothesis is:
+The central hypothesis:
 
-> Non-linear financial dynamics can be effectively approximated using collections of locally valid linear models, where locality may be enforced deterministically (distance-based) or stochastically (sampling-based).
+Non-linear financial dynamics can be effectively approximated using collections of locally valid linear models, where locality may be enforced deterministically (distance-based) or stochastically (sampling-based).
 
-## Quick Start
+Quick Start
+Installation
 
-### Installation
-
-```bash
 # Clone repository
 git clone https://github.com/HarshDubey-12/local-risk-dynamics.git
 cd local-risk-dynamics
 
 # Install dependencies
 pip install -r requirements.txt
-```
 
-### Run Experiments
+Run Experiments
 
-```bash
 # Launch notebook for exploratory data analysis
 jupyter notebook notebooks/01_dataset_exploration.ipynb
 
@@ -54,25 +52,21 @@ jupyter notebook notebooks/05_mcllr_proposed.ipynb
 
 # Compare all model results
 jupyter notebook notebooks/06_results_comparison.ipynb
-```
 
-## Dataset
+Dataset
+We use the Fama–French Five-Factor dataset, a canonical benchmark in asset pricing and quantitative finance.
 
-We use the **Fama�French Five-Factor dataset**, a canonical benchmark in asset pricing and quantitative finance.
+Data location: data/raw/F-F_Research_Data_5_Factors_2x3.csv
 
-**Data location:** `data/raw/F-F_Research_Data_5_Factors_2x3.csv`
-
-### Features (risk factors) at time $t$
-
+Features (risk factors) at time t
 - Market excess return (MKT-RF)
 - Size factor (SMB)
 - Value factor (HML)
 - Profitability factor (RMW)
 - Investment factor (CMA)
 
-### Prediction target
-
-$$y_{t+1} = \text{next-period market excess return}$$
+Prediction target
+yt+1 = next-period market excess return
 
 This formulation ensures:
 
@@ -80,8 +74,7 @@ This formulation ensures:
 - Risk-adjusted interpretation
 - Industry relevance in portfolio and factor modeling
 
-### Data Loading Example
-
+Data Loading Example
 ```python
 import pandas as pd
 import numpy as np
@@ -104,263 +97,186 @@ print(f"Shape: X={X.shape}, y={y.shape}")
 print(f"Date range: {df['Date'].min()} to {df['Date'].max()}")
 ```
 
-## Model Hierarchy
+Scientific Framing
+This work is not merely a finance regression comparison. It is a study of deterministic vs stochastic locality in linear model ensembles for non-stationary environments. While finance provides a realistic testbed, the framework generalizes to energy demand forecasting, dynamic pricing, sensor modeling, and time-varying control systems.
 
-### 1. Global Linear Regression � Stationary Baseline
+Mathematical Foundation of Locality
+From Global Linearity to Stochastic Locality
+The repository’s models form a precise theoretical ladder:
 
-$$y_t = X_t \beta + \epsilon_t$$
+Global Linear Regression → LWLR → Monte Carlo LR → MCLLR
 
-**Assumptions**
+Each step relaxes one structural assumption:
 
-- Constant factor sensitivities
-- Single market regime
-- Linear global structure
+Model | Relaxes | Limitation Remaining
+---|---:|---
+Global LR | Stationarity | No locality
+LWLR | Globality | Deterministic locality, no uncertainty
+MC Linear | Determinism | No geometric locality
+MCLLR | — | Stochastic locality
 
-**Role in the project**
+Thus MCLLR is a stochastic generalization of local regression, not merely an ensemble.
 
-- Provides a stationary benchmark
-- Quantifies mis-specification under regime shifts
+Kernel Similarity and Local Geometry
+For a query state x0:
 
-**Usage Example**
+w_i(x0) = exp(-||x_i - x0||^2 / (2 tau^2))
 
+These kernel weights encode geometric similarity and deterministic locality but are not probabilities.
+
+Probability Normalization — The Critical Bridge
+To enable sampling we normalize weights to obtain a discrete probability distribution over data indices:
+
+p_i(x0) = w_i(x0) / sum_j w_j(x0)
+
+This preserves relative similarity, ensures the probabilities sum to one, and converts deterministic geometry into probabilistic locality.
+
+Stochastic Local Sampling
+Fixed-Size Local Neighborhoods (canonical MCLLR)
+
+S_k ~ Multinomial(m, p(x0))
+
+Where m is the stochastic neighborhood size; each sample defines a plausible local regime realization and yields a local regression.
+
+Random-Size Locality (extensions)
+Bernoulli inclusion
+Poisson sampling
+
+These model uncertainty in regime width, not only membership.
+
+Diversity-Aware and Continuous Extensions
+Weighted sampling without replacement
+Determinantal point processes
+Kernel density / GP-style resampling
+
+The MCLLR Estimator
+For r Monte Carlo realizations:
+
+y^(k)(x0) = x0^T beta^_{S_k}
+
+Mean prediction:
+y^(x0) = (1/r) sum_{k=1..r} y^(k)(x0)
+
+Predictive variance:
+sigma^2(x0) = (1/r) sum_k (y^(k)(x0) - y^(x0))^2
+
+Thus MCLLR computes expectation and variance over stochastic local linear models.
+
+Interpretation of Core Parameters
+tau (bandwidth): geometric locality in LWLR
+m (subsample size): stochastic locality scale (analogue of bandwidth)
+r (MC repetitions): number of stochastic local worlds simulated (controls estimation stability)
+
+Monte Carlo convergence: estimation error ∝ 1/r.
+
+Regime Interpretation
+MCLLR does not explicitly label regimes. Instead it models a distribution over locally valid linear behaviors; regime uncertainty emerges implicitly from probabilistic local membership and stochastic sampling.
+
+Unified Theoretical Statement
+Monte Carlo Local Linear Regression estimates predictions as expectations over locally fitted linear models drawn from a kernel-defined probability distribution, modeling non-stationary dynamics through stochastic locality rather than deterministic regime partitioning.
+
+Model Hierarchy & Usage Examples
+1) Global Linear Regression — Stationary Baseline
 ```python
 from sklearn.linear_model import LinearRegression
 
-# Fit global model
 model = LinearRegression()
 model.fit(X_train, y_train)
-
-# Predict
 y_pred = model.predict(X_test)
-mse = np.mean((y_test - y_pred) ** 2)
 ```
 
-### 2. Locally Weighted Linear Regression (LWLR) � Deterministic Locality
-
-LWLR fits a query-specific linear model using distance-based kernel weights:
-
-$$\hat{\beta}(x_0) = (X^T W(x_0) X)^{-1} X^T W(x_0) y$$
-
-**Gaussian kernel weights:**
-
-$$w_i(x_0) = \exp\left(-\frac{\|x_i - x_0\|^2}{2\tau^2}\right)$$
-
-**Key properties**
-
-- Reduces bias via local linearization
-- Sensitive to bandwidth selection
-- Produces deterministic, regime-aware predictions
-
-**Interpretation**
-
-Financial factor sensitivities vary smoothly across similar market conditions.
-
-**Usage Example**
-
+2) Locally Weighted Linear Regression (LWLR) — Deterministic Locality
 ```python
 from src.models.lwlr import LocallyWeightedLinearRegression
 
-# Initialize LWLR with bandwidth parameter
 lwlr = LocallyWeightedLinearRegression(bandwidth=1.0)
-
-# Fit on training data
 lwlr.fit(X_train, y_train)
-
-# Predict on test point (query-specific model)
 y_pred = lwlr.predict(X_test)
 ```
 
-### 3. Monte Carlo Subsampled Linear Regression � Stochastic Global Ensemble
-
-**Procedure**
-
-1. Randomly sample small subsets of historical data
-2. Fit linear regression (via SGD) on each subset
-3. Aggregate predictions across simulations
-
-**Outputs**
-
-- Mean prediction  expected return
-- Prediction variance  uncertainty / risk
-
-**Key distinction from LWLR**
-
-- Locality arises from sampling, not geometry
-- Captures uncertainty but lacks distance awareness
-
-**Interpretation**
-
-Market behavior is better represented as a distribution of plausible linear regimes rather than a single deterministic fit.
-
-**Usage Example**
-
+3) Monte Carlo Subsampled Linear Regression — Stochastic Global Ensemble
 ```python
 from src.models.mc_linear import MonteCarloLinearRegression
 
-# Initialize with 100 Monte Carlo samples
 mc_model = MonteCarloLinearRegression(n_simulations=100, subsample_size=50)
-
-# Fit ensemble
 mc_model.fit(X_train, y_train)
-
-# Get mean prediction and uncertainty
 y_mean, y_std = mc_model.predict(X_test, return_std=True)
 ```
 
-### 4. Monte Carlo Local Linear Regression (MCLLR) � Stochastic Locality (Proposed)
-
-MCLLR combines:
-
-- Kernel-defined neighborhoods (from LWLR)
-- Monte Carlo sampling (from stochastic ensembles)
-- Local linear regression aggregation
-
-**For each query point:**
-
-1. Define a local region via distance kernel
-2. Randomly sample multiple neighborhoods within that region
-3. Fit local linear models
-4. Aggregate:
-   - Mean prediction
-   - Local uncertainty
-   - Distance-aware weighting
-
-**Conceptual contribution**
-
-MCLLR converts deterministic bandwidth sensitivity into stochastic robustness by averaging across sampled local neighborhoods.
-
-This produces:
-
-- Regime-aware predictions
-- Quantified uncertainty
-- Improved stability under non-stationarity
-
-**Usage Example**
-
+4) Monte Carlo Local Linear Regression (MCLLR) — Stochastic Locality (Proposed)
 ```python
 from src.models.mcllr import MonteCarloLocalLinearRegression
 
-# Initialize MCLLR with both locality and stochasticity
 mcllr = MonteCarloLocalLinearRegression(
     bandwidth=1.0,
     n_simulations=50,
     subsample_size=30
 )
 
-# Fit model
 mcllr.fit(X_train, y_train)
-
-# Predict with uncertainty quantification
 y_pred, y_unc = mcllr.predict(X_test, return_uncertainty=True)
 ```
 
-## Project Structure
+Experimental Goals
+- Prediction accuracy across regimes
+- Stability vs variance trade-offs
+- Uncertainty calibration
+- Robustness to non-stationarity
 
+Project Structure
 ```
 local-risk-dynamics/
- data/
+  data/
     raw/                    # Original Fama-French data
     processed/              # Preprocessed datasets
- notebooks/
+  notebooks/
     01_dataset_exploration.ipynb
     02_global_linear_baseline.ipynb
     03_lwlr_deterministic.ipynb
     04_mc_subsampled_linear.ipynb
     05_mcllr_proposed.ipynb
     06_results_comparison.ipynb
- src/
+  src/
     data/
-       loader.py           # Data loading utilities
-       preprocessing.py    # Preprocessing pipeline
+      loader.py
+      preprocessing.py
     models/
-       global_linear.py
-       lwlr.py
-       mc_linear.py
-       mcllr.py
+      global_linear.py
+      lwlr.py
+      mc_linear.py
+      mcllr.py
     optimization/
-       sgd.py
-       closed_form.py
+      sgd.py
+      closed_form.py
     evaluation/
-       metrics.py
-       backtesting.py
+      metrics.py
+      backtesting.py
     utils/
-        kernels.py
-        sampling.py
-        plotting.py
- experiments/
+      kernels.py
+      sampling.py
+      plotting.py
+  experiments/
     config_global.yaml
     config_lwlr.yaml
     config_mc.yaml
     config_mcllr.yaml
- figures/                    # Output plots and results
- README.md
- requirements.txt
+  figures/
+  README.md
+  requirements.txt
 ```
 
-## Experimental Goals
+Repository Philosophy
+Separates theory (README), engineering (src/), and evidence (notebooks/figures), mirroring quantitative research repositories and ML paper implementations.
 
-The project evaluates:
+Project Status
+Current stage: complete theoretical foundation + structured research scaffold.
 
-- Prediction accuracy across regimes
-- Stability vs variance trade-offs
-- Uncertainty estimation quality
-- Behavior under non-stationary financial dynamics
+Next milestones:
+- Full MCLLR implementation
+- Empirical comparison
+- Industry implications
 
-Rather than asking:
-
-> Which model is best?
-
-we ask:
-
-> How different notions of locality influence risk modeling in non-stationary systems.
-
-## Scientific Framing
-
-This work is not merely a finance regression comparison.
-
-It is a study of:
-
-**Deterministic vs stochastic locality in linear model ensembles for non-stationary environments.**
-
-While finance provides a realistic testbed, the framework generalizes to:
-
-- Energy demand forecasting
-- Dynamic pricing
-- Sensor modeling
-- Time-varying control systems
-
-## Repository Philosophy
-
-The repository is intentionally structured to separate:
-
-- **Theory**  README / documentation
-- **Engineering**  `src/`
-- **Evidence**  notebooks / figures
-
-This mirrors:
-
-- Quantitative research repositories
-- Machine learning paper implementations
-- Production-grade experimentation frameworks
-
-## Project Status
-
-### Current stage
-
-Structured research scaffold with planned modular implementation.
-
-### Next milestones
-
-- Reproducible data pipeline
-- Stationary baseline validation
-- Deterministic and stochastic locality experiments
-- Full implementation of MCLLR
-- Comparative analysis and industry implications
-
-## Contributing
-
-Contributions are welcome. To contribute:
-
+Contributing
 ```bash
 # Create a feature branch
 git checkout -b feature/your-feature-name
@@ -372,15 +288,10 @@ git commit -m "add: descriptive commit message"
 git push origin feature/your-feature-name
 ```
 
-## License
-
+License
 This project is licensed under the MIT License. See LICENSE file for details.
 
-## Key Takeaway
+Key Takeaway
+Financial markets are locally linear but globally non-linear. Understanding risk may therefore require many small linear views of reality—combined through deterministic structure, stochastic sampling, or both.
 
-**Financial markets are locally linear but globally non-linear.**
-
-Understanding risk may therefore require:
-
-> Not one global model, but many small linear views of reality�
-> combined through deterministic structure, stochastic sampling, or both.
+If you'd like, I can next produce a NeurIPS/ICLR-style paper draft, a formal mathematical appendix, or implement the full MCLLR algorithm and notebooks.
