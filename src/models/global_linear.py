@@ -29,7 +29,7 @@ class GlobalLinearRegression:
 
     Parameters 
     ----------
-    fir_intercept : bool, default = True
+    fit_intercept : bool, default = True
         whether to include an intercept term in the model
     
     Attributes 
