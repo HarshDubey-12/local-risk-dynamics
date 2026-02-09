@@ -14,177 +14,102 @@ stochastic local models (MCLLR) are evaluated.
 """
 
 from __future__ import annotations
-from typing import Tuple
-import numpy as np 
+import numpy as np
+from typing import Optional
 
-class LocallyWeightedLinearRgression:
+
+class LocallyWeightedLinearRegression:
     """
-    Gaussian Kernel Locality weighted linear Regression.
-
-    parameters 
-    ------------
-    bandwidth : float
-        Kernel bandwidth(tau). must be positive.
-
-    fit_intercept : bool, default = True
-        Whether to include an intercept term.
-
-    Attributes
-    ------------
-    X_train_ : np.ndarray
-        Stored training features.
-    
-    y_train_ : np.ndarray
-        Stored training targets.
-
-    n_features_ : int
-        Number of features in training data.
-
-    is_fitted_ : bool
-        indicates whether the model has been fitted.
+    Gaussian Kernel Locally Weighted Linear Regression (LWLR).
     """
 
     def __init__(self, bandwidth: float, fit_intercept: bool = True) -> None:
         if bandwidth <= 0:
             raise ValueError("bandwidth must be strictly positive.")
-        self.bandwidth = bandwidth
+
+        self.bandwidth = float(bandwidth)
         self.fit_intercept = fit_intercept
 
-        self.X_train_ : np.ndarray | None = None
-        self.y_train_ : np.ndarray | None = None 
-        self.n_features_ : int | None = None
-        self.is_fitted_ : bool = False
+        self.X_train_: Optional[np.ndarray] = None
+        self.y_train_: Optional[np.ndarray] = None
+        self.n_features_: Optional[int] = None
+        self.is_fitted_: bool = False
 
-    # ----------------------------------------------------------------
-    # Internal Utilities 
-    # ----------------------------------------------------------------
+    # --------------------------------------------------------------
 
-    def _add_intecept(self, X: np.ndarray) -> np.ndarray:
-        """Add intercept column if enabled."""
+    def _add_intercept(self, X: np.ndarray) -> np.ndarray:
         if not self.fit_intercept:
             return X
-        
-        ones = np.ones((X.shape[0],1),dtype=X.dtype)
-        return np.hstack((ones,X))
-    
+        ones = np.ones((X.shape[0], 1), dtype=X.dtype)
+        return np.hstack((ones, X))
+
     def _check_is_fitted(self) -> None:
         if not self.is_fitted_:
             raise RuntimeError("Model must be fitted before prediction.")
-        
+
     def _gaussian_kernel(self, X: np.ndarray, x0: np.ndarray) -> np.ndarray:
-        """
-        Compute Gaussian kernel weights for query point x0.
-        """
-        diff = X-x0
-        dist_sq = np.sum(diff**2,axis = 1)
-        weights = np.exp(-dist_sq/(2*self.bandwidth**2))
+        diff = X - x0
+        dist_sq = np.sum(diff ** 2, axis=1)
+        return np.exp(-dist_sq / (2 * self.bandwidth ** 2))
 
-    # -----------------------------------------------------------------
-    # Core API
-    # -----------------------------------------------------------------
+    # --------------------------------------------------------------
 
-    def fit(self, X: np.ndarray, y: np.ndarray) -> "LocallyWeightedLinearRgression":
-        """ 
-        Store training data for lazy local regression.
-
-        Parameters
-        ------------
-        X : np.ndarray of shape (n_samples, n_featres)
-        y : np.ndarray of shape (n_samples,)
-
-        Returns 
-        ------------
-        self 
-        """
+    def fit(self, X: np.ndarray, y: np.ndarray) -> "LocallyWeightedLinearRegression":
         if X.ndim != 2:
-            raise ValueError("X must be a 2D array.")
-        
+            raise ValueError("X must be 2D.")
         if y.ndim != 1:
-            raise ValueError("y must be a 1D array.")
-        
+            raise ValueError("y must be 1D.")
         if X.shape[0] != y.shape[0]:
-            raise ValueError("X and y must have same number of sapmles.")
-        
+            raise ValueError("X and y must match in sample size.")
         if X.shape[0] == 0:
-            raise ValueError("Cannot fit on empty dataset.")
-        
-        self.X_train_ = X
-        self.y_train_ = y
+            raise ValueError("Empty dataset.")
+
+        self.X_train_ = X.astype(float)
+        self.y_train_ = y.astype(float)
         self.n_features_ = X.shape[1]
         self.is_fitted_ = True
 
         return self
-    
-    # ----------------------------------------------------------------
+
+    # --------------------------------------------------------------
 
     def predict(self, X_query: np.ndarray) -> np.ndarray:
-        """
-        Predict using locally weighted regression.
+        self._check_is_fitted()
 
-        Parameters 
-        ------------
-        X_query : np.ndarray of shape (n_queries, n_features)
-        
-        Returns
-        ------------
-        y_pred : np.ndarray of shape (n_queries,)
-        """
-
-        self.__check_is_fitted()
-
-        if X_query.ndim !=2:
-            raise ValueError("X_query must be a 2D array.")
-        
+        if X_query.ndim != 2:
+            raise ValueError("X_query must be 2D.")
         if X_query.shape[1] != self.n_features_:
             raise ValueError(
                 f"Expected {self.n_features_} features, got {X_query.shape[1]}"
             )
-        
+
         X_train = self.X_train_
         y_train = self.y_train_
+        X_design = self._add_intercept(X_train)
 
-        y_pred = []
+        y_pred = np.zeros(X_query.shape[0])
 
-        for x0 in X_query:
-            # Compute kernel weights 
-            weights = self._gaussian_kernel(X_train,x0)
+        for i, x0 in enumerate(X_query):
+            weights = self._gaussian_kernel(X_train, x0)
 
-            # Construct weighted design matrix 
-            X_design = self._add_intecept(X_train)
-            w = np.diag(weights)
+            # Avoid explicit diagonal matrix
+            W = weights[:, np.newaxis]
+            X_weighted = X_design * W
 
-            # Weighted least squares via pseudo_inverse 
-            beta = np.linalg.pinv(X_design.T @ w @ X_design) @ (X_design.T @ w @ y_train)
+            A = X_design.T @ X_weighted
+            b = X_design.T @ (weights * y_train)
 
-            # Prepare query design row
-            x0_design = self._add_intecept(x0.reshape(1,-1))
+            beta = np.linalg.pinv(A) @ b
 
-            # predict 
-            y0 = float(x0_design @ beta)
-            y_pred.append(y0)
-        
-        return np.array(y_pred)
-    
+            x0_design = self._add_intercept(x0.reshape(1, -1))
+            y_pred[i] = float(x0_design @ beta)
+
+        return y_pred
+
+    # --------------------------------------------------------------
+
     def score(self, X: np.ndarray, y: np.ndarray) -> float:
-        """
-        Compute Mean Square Error (MSE).
-
-        Parameters 
-        ------------
-        X : np.ndarray
-        y : np.ndarray 
-
-        Return
-        ------------
-        mse : float
-        """
-        if y.ndim != 1:
-            raise ValueError("y must be 1D.")
-
-        if X.shape[0] != y.shape[0]:
-            raise ValueError("X and y must have same number of samples.")
+        self._check_is_fitted()
 
         y_pred = self.predict(X)
-        mse = np.mean((y - y_pred) ** 2)
-
-        return float(mse)
+        return float(np.mean((y - y_pred) ** 2))
