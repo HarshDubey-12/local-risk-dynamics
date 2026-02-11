@@ -217,6 +217,118 @@ mcllr.fit(X_train, y_train)
 y_pred, y_unc = mcllr.predict(X_test, return_uncertainty=True)
 ```
 
+Monte Carlo Local Linear Regression (MCLLR) — Design Architecture
+
+The following section documents the core design philosophy of MCLLR, defining its structural choices before implementation. These decisions reflect a unified principle: **stochastic locality through kernel-weighted probabilistic sampling, with uncertainty realization via Monte Carlo aggregation**.
+
+**Query-Dependent Locality**
+
+*What:* The algorithm executes an outer loop over test points and an inner loop over stochastic simulations. Kernel weights depend on each query point x₀, making locality query-specific rather than pre-computed globally.
+
+*Why:* In time-series financial data, different regimes have different local geometries. A fixed global weighting scheme cannot capture this. By recomputing weights for each prediction point, the model adapts its notion of "nearby" observations to the specific context of the query.
+
+*Role:* This design ensures that MCLLR produces **personalized neighborhoods** for each x₀, enforcing that stochastic samples are drawn from geometrically relevant regions of the feature space. The outer loop structure is not a computational artifact but a deliberate design choice encoding query dependence.
+
+**Squared Euclidean Distance (No Square Root)**
+
+*What:* Kernel weight computation uses squared Euclidean distance: ||x_i - x₀||², not ||x_i - x₀||.
+
+*Why:* Avoiding the square root operation achieves two objectives: (1) numerical stability in floating-point arithmetic when distances are very small, preventing underflow and precision loss; (2) computational efficiency during large-scale prediction, eliminating expensive square root evaluations for every distance pair.
+
+*Role:* This choice preserves monotonic distance ordering (the ranking of nearby points remains unchanged) while improving numerical robustness. It is standard in kernel methods and aligns MCLLR with LWLR implementation practices in the literature.
+
+**Gaussian Kernel for Weight Computation**
+
+*What:* Weights are computed via the Gaussian (RBF) kernel:
+
+w_i(x₀) = exp(−||x_i − x₀||²/(2τ²))
+
+*Why:* The Gaussian kernel provides smooth, continuous locality: points near x₀ receive high weight, distant points receive exponentially decaying weight. This is theoretically justified for regression neighborhoods because it enforces smooth transitions between local regimes rather than sharp cutoffs (which would create discontinuities in predictions).
+
+*Role:* This serves as the **geometric locality function**. The bandwidth parameter τ controls the spatial extent of locality. The kernel is deterministic and problem-independent; its output is treated as raw similarity, not probability.
+
+**Normalization of Weights Only Before Sampling**
+
+*What:* Weights are normalized to probabilities exclusively to enable sampling:
+
+p_i = w_i / ∑_j w_j
+
+Normalization does **not** occur before regression; it occurs only to define the probability distribution for drawing the stochastic neighborhood.
+
+*Why:* Normalization serves one purpose: to ensure sampling probabilities sum to one. Inside each simulation, OLS regression uses original weights only if explicitly weighting is demanded; however, in MCLLR's core design, the key insight is that normalization is probabilistic, not geometric. This separation prevents double-counting locality.
+
+*Role:* This normalization is the **critical bridge** between deterministic geometry and stochastic locality. It converts kernel similarities (unnormalized) into a discrete probability measure over observations, enabling principled sampling.
+
+**Weighted Random Sampling Without Replacement**
+
+*What:* Given probabilities p_i derived from normalized weights, MCLLR draws a fixed-size sample S_k of size m without replacement from the training set, where each observation has probability proportional to p_i.
+
+*Why:* Sampling without replacement is preferred over multinomial sampling (with replacement) because: (1) it preserves observation **uniqueness** within a neighborhood, enforcing that each local regression uses distinct observations; (2) it avoids redundancy in the local feature space, maintaining geometric diversity; (3) it models a concrete "plausible local world" rather than abstract reweighting.
+
+*Role:* This mechanism **realizes stochasticity** in locality selection. Each simulation k draws a different local subset, inducing variation in local linear models and ultimately in predictions. The randomness captures uncertainty in which observations best characterize the local regime.
+
+**Plain OLS Inside Each Simulation**
+
+*What:* Within each simulation, the selected subsample S_k is fit using ordinary least squares (OLS)—ordinary, unweighted regression—not weighted regression.
+
+*Why:* Locality has already been enforced via the sampling step: by construction, S_k contains observations with high kernel weight relative to x₀. Applying weighted regression again within the subsample would **double-count locality**, giving disproportionate influence to nearby points even among nearby points. OLS inside the sampled neighborhood is sufficient and theoretically correct.
+
+*Role:* This choice ensures **clean separation of concerns**: sampling enforces geometric locality; OLS fits the local surface. The combination avoids compound locality effects that would distort local linear approximation.
+
+**Monte Carlo Aggregation (Mean and Standard Deviation)**
+
+*What:* After fitting r independent local linear models via sampling and OLS, predictions aggregate as:
+
+ŷ(x₀) = (1/r) ∑_{k=1}^r ŷ^{(k)}(x₀)
+
+σ̂²(x₀) = (1/r) ∑_{k=1}^r (ŷ^{(k)}(x₀) − ŷ(x₀))²
+
+*Why:* Monte Carlo integration produces both point estimates (mean) and uncertainty quantification (variance). The standard deviation reflects sampling variability across stochastic local models, encoding our epistemic uncertainty about which local regime applies to x₀. This is interpretable as a predictive distribution.
+
+*Role:* This aggregation is the **uncertainty mechanism** of MCLLR. Variance does not reflect training noise (as in classical frequentist regression); it reflects regime uncertainty—the ensemble spread of plausible local linear behaviors. This is essential for risk-aware decision-making in finance.
+
+**No Model-Switching Logic**
+
+*What:* MCLLR does not contain hidden conditional logic that changes model behavior based on hyperparameters. Hyperparameters τ (bandwidth) and m (subsample size) directly scale locality geometry and stochastic neighborhood size, but do not trigger regime switches or algorithmic branches.
+
+*Why:* This maintains interpretability and ensures **smooth theoretical degeneracy**. MCLLR must naturally reduce to simpler models as follows:
+
+- Large τ (broad bandwidth) → all observations weighted nearly equally → sampling is nearly uniform → MCLLR → MC Linear Regression
+  
+- Large m (subsample size) → S_k approaches the full training set → local models become global models → MCLLR → LWLR
+  
+- Both large τ and large m → all observations uniformly sampled in large subsets → MCLLR → Global Linear Regression
+
+These limiting behaviors must emerge from the same code path, not from explicit conditional branches. This guarantees theoretical consistency and prevents ad-hoc model selection.
+
+*Role:* This design ensures MCLLR is a **unified, parameter-continuous framework** encompassing global and local approaches. It validates that MCLLR is a generalization, not a disjoint ensemble method.
+
+**Epsilon-Based Numerical Stability Safeguard**
+
+*What:* When computing normalized weights p_i = w_i / (∑_j w_j), if the sum ∑_j w_j is numerically very small (below machine epsilon), a small constant ε is added to prevent division by zero or catastrophic precision loss.
+
+*Why:* In rare edge cases—such as prediction far from the training support where all weights become vanishingly small—floating-point computation may produce NaN or Inf. The epsilon safeguard ensures numerical stability without altering the model's structural logic or changing weights materially.
+
+*Role:* This is a **robustness safeguard** that keeps the algorithm running correctly in numerical boundary conditions without compromising design philosophy. It is not a modeling choice but an engineering necessity.
+
+**Clear Separation of Responsibilities**
+
+The MCLLR architecture enforces a clean functional decomposition:
+
+| Component | Function | Responsibility |
+|---|---|---|
+| Kernel | w_i(x₀) = exp(−\\||x_i − x₀\\||²/(2τ²)) | Geometric locality; deterministic similarity |
+| Normalization | p_i = w_i / ∑_j w_j | Probability assignment; sampling distribution |
+| Sampling | S_k ∼ p_i without replacement | Stochastic neighborhood realization |
+| OLS | β̂_k = (S_k^T S_k)^{−1} S_k^T y_k | Local surface fitting within neighborhood |
+| Aggregation | ŷ = mean, σ̂² = var over k | Uncertainty quantification; ensemble prediction |
+
+This separation ensures each component has a single, well-defined purpose. Changes to one (e.g., kernel choice) do not cascade through the pipeline; design modifications remain localized and testable.
+
+**Conceptual Summary**
+
+Monte Carlo Local Linear Regression is a stochastic realization of local linear approximations whose uncertainty emerges from probabilistic neighborhood selection. By decoupling deterministic geometric locality (kernels) from stochastic membership (sampling), MCLLR captures both regime-dependent non-linearity and estimation uncertainty in a unified, theoretically coherent framework.
+
 Experimental Goals
 - Prediction accuracy across regimes
 - Stability vs variance trade-offs
