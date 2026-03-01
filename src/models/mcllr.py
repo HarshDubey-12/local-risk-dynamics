@@ -144,7 +144,7 @@ class MonteCarloLocalLinearRegression:
             raise ValueError("X0 must be a 1D array")
         
         if X0.shape != self.n_features_:
-            raise ValueError(f"Expected {self.n_features_} features, got {x0.shape[0]}")
+            raise ValueError(f"Expected {self.n_features_} features, got {X0.shape[0]}")
         
         # compute euclidean squared distances
         diff = self.X_train_ - X0
@@ -178,7 +178,7 @@ class MonteCarloLocalLinearRegression:
         eps = 1e-12
 
         # Loop over test points(query independent locality)
-        for k in range(n_test):
+        for i in range(n_test):
 
             x0 = X[i]
 
