@@ -54,18 +54,23 @@ def load_fama_french(
      if not csv_path.exists():
           raise FileNotFoundError(f"Fama-French file not found: {csv_path}")
      
-     # Load CSV (skip metadata header rows)
-     df = pd.read_csv(csv_path, skiprows = 3)
+     # Load CSV (skip metadata lines 0-3, header is on line 4)
+     # use skipinitialspace to trim leading spaces in numeric columns
+     df = pd.read_csv(csv_path, skiprows=4, skipinitialspace=True)
 
-     # Rename first colummn to 'Date' if unnamed 
+     # Rename first column to 'Date' if unnamed 
      if "Date" not in df.columns:
           df = df.rename(columns = {df.columns[0]: "Date"})
 
-     # Pasre dates(YYYYMM format)
-     df["Date"] = pd.to_datetime(df["Date"].astype(str), format="%y%m")
+     # Drop any extraneous metadata rows that sneaked in (e.g. repeated headers or notes)
+     # Keep only entries where the Date column looks like YYYYMM digits
+     df = df[df["Date"].astype(str).str.match(r"^\d{6}$")]
 
-     # Convert percentage returns -> decimals 
-     df[ALL_RETURN_COLUMNS] = df[ALL_RETURN_COLUMNS]/100.0
+     # Parse dates (YYYYMM format)
+     df["Date"] = pd.to_datetime(df["Date"].astype(str), format="%Y%m")
+
+     # Convert percentage returns -> decimals (ensure numeric type first)
+     df[ALL_RETURN_COLUMNS] = df[ALL_RETURN_COLUMNS].apply(pd.to_numeric, errors='coerce') / 100.0
 
      # Feature matrix at time t
      X = df[FACTOR_COLUMNS].to_numpy(dtype = float)
@@ -75,8 +80,8 @@ def load_fama_french(
 
      # Remove last row (NaN after shift)
      valid_mask = ~np.isnan(y)
-     x = X[valid_mask]
+     X = X[valid_mask]
      y = y[valid_mask]
      dates = df.loc[valid_mask,"Date"]
 
-     return X,y,pd.DatetimeIndex(dates)
+     return X, y, pd.DatetimeIndex(dates)

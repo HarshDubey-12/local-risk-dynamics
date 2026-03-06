@@ -1,24 +1,15 @@
-"""
-MCLLR (Monte Carlo + LWLR) proposed model scaffold
-
-This module will contain the proposed hybrid model used for experiments.
-
-TODO:
- - Add public API for MCLLR model.
- - Implement training, prediction, and evaluation helpers.
-"""
+from __future__ import annotations
 
 """
 Monte Carlo Local Linear Regression (MCLLR).
 
-This model combines:
-    - Geometric locality via kernel weights
+This module implements the proposed hybrid model combining:
+    - Geometric locality via Gaussian kernel weighting
     - Stochastic locality via Monte Carlo sampling
 
-It produces uncertainty-aware, locally adaptive predictions.
+It produces uncertainty-aware, locally adaptive predictions for non-stationary financial data.
 """
 
-from __future__ import annotations
 import numpy as np
 
 class MonteCarloLocalLinearRegression:
@@ -123,9 +114,53 @@ class MonteCarloLocalLinearRegression:
         return np.hstack((ones, X))
     
     # ------------------------------------------------------------------
+    # Fit
+    # ------------------------------------------------------------------
+    def fit(self, X: np.ndarray, y: np.ndarray) -> "MonteCarloLocalLinearRegression":
+        """
+        Store training data for Monte Carlo local sampling.
+
+        Parameters
+        ----------
+        X : np.ndarray of shape (n_samples, n_features)
+            Training feature matrix.
+        
+        y : np.ndarray of shape (n_samples,)
+            Training target vector.
+
+        Returns
+        -------
+        self : MonteCarloLocalLinearRegression
+            Fitted model instance.
+        """
+        if X.ndim != 2:
+            raise ValueError("X must be a 2D array.")
+        
+        if y.ndim != 1:
+            raise ValueError("y must be a 1D array.")
+        
+        if X.shape[0] != y.shape[0]:
+            raise ValueError("X and y must have the same number of samples.")
+        
+        if X.shape[0] == 0:
+            raise ValueError("Cannot fit on an empty dataset.")
+        
+        if self.subsample_size > X.shape[0]:
+            raise ValueError(
+                "subsample_size cannot exceed number of training samples."
+            )
+        
+        self.X_train_ = X.astype(float)
+        self.y_train_ = y.astype(float)
+        self.n_features_ = X.shape[1]
+        self.is_fitted_ = True
+        
+        return self
+
+    # ------------------------------------------------------------------
     # Compute Kernel Weights 
     # ------------------------------------------------------------------
-    def _compute_kerne_weights(self, X0:np.ndarray)-> np.ndarray:
+    def _compute_kernel_weights(self, x0: np.ndarray) -> np.ndarray:
         """
         Compute raw Gaussian kernel weights for a single query point.
 
@@ -140,25 +175,57 @@ class MonteCarloLocalLinearRegression:
             Raw (unnormalized) kernel weights.
         """
 
-        if X0.ndim != 1:
-            raise ValueError("X0 must be a 1D array")
+        if x0.ndim != 1:
+            raise ValueError("x0 must be a 1D array")
         
-        if X0.shape != self.n_features_:
-            raise ValueError(f"Expected {self.n_features_} features, got {X0.shape[0]}")
+        if x0.shape[0] != self.n_features_:
+            raise ValueError(f"Expected {self.n_features_} features, got {x0.shape[0]}")
         
-        # compute euclidean squared distances
-        diff = self.X_train_ - X0
-        sq_dist = np.sum(diff**2, axis = 1)
+        # Compute squared Euclidean distances (no square root for numerical stability)
+        diff = self.X_train_ - x0
+        sq_dist = np.sum(diff ** 2, axis=1)
 
-        # Gaussian Kernel 
-        weights = np.exp(-sq_dist / (2*self.bandwidth**2) )
+        # Gaussian kernel: w_i(x0) = exp(-||x_i - x0||^2 / (2*tau^2))
+        weights = np.exp(-sq_dist / (2 * self.bandwidth ** 2))
 
         return weights
 
     # ------------------------------------------------------------------
     # Predict  
     # ------------------------------------------------------------------
-    def predict(self, X: np.ndarray, return_std: bool = False) -> np.ndarray | tuple[np.ndarray,np.ndarray]:
+    def predict(
+        self,
+        X: np.ndarray,
+        return_std: bool = False,
+    ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+        """
+        Predict target values for query points using MCLLR.
+
+        For each test point x0:
+          1. Compute kernel weights w_i(x0) = exp(-||x_i - x0||^2 / (2*tau^2))
+          2. Normalize to probabilities p_i = w_i / sum(w_i) + eps
+          3. For r=1 to n_simulations:
+             a. Sample neighborhood S_r ~ w/o replacement(m, p)
+             b. Fit plain OLS on S_r
+             c. Predict y_r at x0
+          4. Aggregate: mean(y_r), std(y_r)
+
+        Parameters
+        ----------
+        X : np.ndarray of shape (n_test, n_features)
+            Query point matrix.
+        
+        return_std : bool, default=False
+            Whether to return uncertainty (standard deviation).
+
+        Returns
+        -------
+        y_pred : np.ndarray of shape (n_test,)
+            Mean predicted values.
+        
+        y_std : np.ndarray of shape (n_test,), optional
+            Predicted standard deviations (if return_std=True).
+        """
         
         self._check_is_fitted()
 
@@ -171,60 +238,56 @@ class MonteCarloLocalLinearRegression:
             )
         
         n_test = X.shape[0]
-
         mean_predictions = np.zeros(n_test)
         std_predictions = np.zeros(n_test)
-
         eps = 1e-12
 
-        # Loop over test points(query independent locality)
+        # Outer loop over test points (query-dependent locality)
         for i in range(n_test):
-
             x0 = X[i]
 
-            # Compute the kernel weights 
-            weights = self._compute_kerne_weights(x0)
+            # Step 1: Compute raw kernel weights for this query point
+            weights = self._compute_kernel_weights(x0)
 
-            # Normalize to probabilities(with epsilon safeguard)
+            # Step 2: Normalize to probabilities (critical bridge)
             weight_sum = np.sum(weights)
-            probabilities = weights/(weight_sum + eps)
+            probabilities = weights / (weight_sum + eps)
 
-            # Store simulation prediction for this query
+            # Store Monte Carlo predictions for aggregation
             simulation_preds = np.zeros(self.n_simulations)
 
-            # Monte Carlo Loop
+            # Inner loop: Monte Carlo simulations with stochastic neighborhoods
             for k in range(self.n_simulations):
-
-                # Sample indices according to local probabilities
+                # Step 3: Sample local neighborhood without replacement
                 indices = self._rng.choice(
                     self.X_train_.shape[0],
-                    size = self.subsample_size,
-                    replace = False,
-                    p = probabilities
+                    size=self.subsample_size,
+                    replace=False,
+                    p=probabilities,
                 )
 
-                # Create local subsamples 
+                # Create subsampled local neighborhood
                 X_sub = self.X_train_[indices]
                 y_sub = self.y_train_[indices]
 
-                # Build design matrix 
-                x_sub_design = self._add_intercept(X_sub)
+                # Step 4: Fit plain OLS (unweighted) on local subset
+                # Locality enforced via sampling, not regression weights
+                X_sub_design = self._add_intercept(X_sub)
+                beta = np.linalg.pinv(X_sub_design) @ y_sub
 
-                # Solve OlS
-                beta = np.linalg.pinv(x_sub_design) @ y_sub
-
-                # Predict at X0
-                x0_design = self._add_intercept(x0.reshape(1,-1))
-                simulation_preds[k] = (x0_design @ beta ).item()
+                # Predict at x0 with local linear model
+                x0_design = self._add_intercept(x0.reshape(1, -1))
+                simulation_preds[k] = (x0_design @ beta).item()
             
-            # Aggregate for this test point 
-            mean_predictions[i] = simulation_preds.mean()
-            std_predictions[i] = simulation_preds.std()
+            # Step 5: Aggregate Monte Carlo predictions
+            mean_predictions[i] = np.mean(simulation_preds)
+            std_predictions[i] = np.std(simulation_preds)
 
-            if return_std:
-                return mean_predictions, std_predictions
-            
-            return mean_predictions
+        # Return after processing all test points
+        if return_std:
+            return mean_predictions, std_predictions
+        
+        return mean_predictions
         
     # ------------------------------------------------------------------
     # Score 

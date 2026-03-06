@@ -1,10 +1,7 @@
-"""
-Global linear model module
+from __future__ import annotations
+from typing import Tuple
 
-Contains production-ready wrapper for a global linear baseline model.
-"""
-
-# TODO: implement model class and utilities
+import numpy as np
 
 """
 Global Linear Regression model for Local Risk Dynamics.
@@ -18,10 +15,6 @@ Serves as the control model assuming constant factor sensitivities
 across time. Performance gaps versus local or stochastic models
 quantify the effect of non-stationarity in financial data.
 """
-from __future__ import annotations 
-from typing import Tuple
-
-import numpy as np
 
 class GlobalLinearRegression:
     """
@@ -60,12 +53,12 @@ class GlobalLinearRegression:
     # Internal Utilities
     # -----------------------------------------------------------------
 
-    def _add_intercept(self,X: np.ndarray)-> np.ndarray:
+    def _add_intercept(self, X: np.ndarray) -> np.ndarray:
         """Add a column of ones to X if intercept is enabled."""
         if not self.fit_intercept:
             return X
-        
-        ones = np.ones((X.shape[0],1),dtype=X.dtype)
+        ones = np.ones((X.shape[0], 1), dtype=X.dtype)
+        return np.hstack((ones, X))
 
     def _check_is_fitted_(self)->None:
         """Raise an error if the model is not fitted."""
@@ -149,7 +142,7 @@ class GlobalLinearRegression:
         if X.ndim != 2:
             raise ValueError("X must be a 2D array.")
         
-        if X.shape != self.n_features_:
+        if X.shape[1] != self.n_features_:
             raise ValueError(
                 f"Expected {self.n_features_} features, got {X.shape[1]}"
             )
