@@ -1,6 +1,7 @@
 from pathlib import Path 
-from typing import List
+from typing import List, Callable
 import pandas as pd 
+import numpy as np
 
 from ..config import ExperimentConfig
 from ..data.pipeline import DataPipeline
@@ -16,8 +17,18 @@ class ExperimentRunner:
         self.pipeline = DataPipeline()
         self.results = {}
 
-    def run(self) -> pd.DataFrame:
-        """Execute full experiment."""
+    def run(
+        self,
+        extra_metrics: Dict[str, Callable[[np.ndarray, np.ndarray], float]] | None = None,
+    ) -> pd.DataFrame:
+        """Execute full experiment.
+
+        Parameters
+        ----------
+        extra_metrics : dict, optional
+            Additional evaluation functions (y_true, y_pred) -> float. They
+            will be forwarded to ``Evaluator.evaluate``.
+        """
 
         # 1. Load data once
         print("Loading dataset...")
@@ -39,7 +50,9 @@ class ExperimentRunner:
             model = Modelfactory.create(model_config)
             model.fit(X_train, y_train)
 
-            eval_result = Evaluator.evaluate(model, X_test, y_test)
+            eval_result = Evaluator.evaluate(
+                model, X_test, y_test, extra_metrics=extra_metrics
+            )
             results.append(eval_result)
             print(f" {eval_result}")
 

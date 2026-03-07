@@ -16,7 +16,9 @@ across time. Performance gaps versus local or stochastic models
 quantify the effect of non-stationarity in financial data.
 """
 
-class GlobalLinearRegression:
+from ..models.base import LocalRiskModel
+
+class GlobalLinearRegression(LocalRiskModel):
     """
     Closed_form Ordinary Least Squares linear regression.
 
@@ -189,3 +191,19 @@ class GlobalLinearRegression:
         mse = np.mean((y - y_pred) ** 2)
 
         return float(mse)
+
+    # -----------------------------------------------------------------
+    # Interface compliance
+    # -----------------------------------------------------------------
+
+    @property
+    def is_fitted(self) -> bool:
+        return self.is_fitted_
+
+    @property
+    def model_name(self) -> str:
+        return "global_linear"
+
+    @property
+    def hyperparameters(self) -> dict:
+        return {"fit_intercept": self.fit_intercept}
