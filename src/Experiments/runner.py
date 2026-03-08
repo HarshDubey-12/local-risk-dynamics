@@ -19,7 +19,7 @@ class ExperimentRunner:
 
     def run(
         self,
-        extra_metrics: Dict[str, Callable[[np.ndarray, np.ndarray], float]] | None = None,
+        extra_metrics: dict[str, Callable[[np.ndarray, np.ndarray], float]] | None = None,
     ) -> pd.DataFrame:
         """Execute full experiment.
 
