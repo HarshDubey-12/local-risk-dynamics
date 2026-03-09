@@ -19,24 +19,37 @@ class Modelfactory:
     @classmethod
     def create(cls, config: ModelCofig) -> LocalRiskModel:
         """Instantiate model from config."""
-        model_cls = cls._registry.get(config.modle_type)
+        model_cls = cls._registry.get(config.model_type)
         if model_cls is None:
             raise ValueError(f"Unknown model: {config.model_type }")
         
-        # Build kwargs from config 
-        kwargs = {
-            "fit_intercept": config.fit_intercept,
-            "random_state": config.random_state,
-        }
-
-        # Add model-specific params
-        if config.model_type == "lwlr":
-            kwargs["bandwidth"] = config.bandwidth
-        elif config.model_type in ["mc_linear","mcllr"]:
-            kwargs["n_simulations"] = config.n_simulations
-            kwargs["subsample_size"] = config.subsample_size
-            if config.model_type == "mcllr":
-                kwargs["bandwidth"] = config.bandwidth
+        # Build model-specific kwargs to avoid passing unsupported args.
+        if config.model_type == "global_linear":
+            kwargs = {
+                "fit_intercept": config.fit_intercept,
+            }
+        elif config.model_type == "lwlr":
+            kwargs = {
+                "bandwidth": config.bandwidth,
+                "fit_intercept": config.fit_intercept,
+            }
+        elif config.model_type == "mc_linear":
+            kwargs = {
+                "n_simulations": config.n_simulations,
+                "subsample_size": config.subsample_size,
+                "fit_intercept": config.fit_intercept,
+                "random_state": config.random_state,
+            }
+        elif config.model_type == "mcllr":
+            kwargs = {
+                "bandwidth": config.bandwidth,
+                "n_simulations": config.n_simulations,
+                "subsample_size": config.subsample_size,
+                "fit_intercept": config.fit_intercept,
+                "random_state": config.random_state,
+            }
+        else:
+            raise ValueError(f"Unknown model: {config.model_type}")
             
         return model_cls(**kwargs)
     
@@ -44,7 +57,3 @@ class Modelfactory:
     def register(cls, name: str, model_cls: Type[LocalRiskModel]):
         """register new model type dynamically."""
         cls._registry[name] = model_cls
-
-# Usage 
-config = ModelCofig.from_yaml("experiments/config_mcllr.yaml")
-model = Modelfactory.create(config)

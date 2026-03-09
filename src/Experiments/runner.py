@@ -72,8 +72,3 @@ class ExperimentRunner:
         """Persist results."""
         self.results.to_csv(path, index=False)
         print(f"Results saved to {path} ")
-
-# Usage in notebook
-runner = ExperimentRunner("experiments/config_comparison.yaml")
-results_df = runner.run()
-print(results_df)

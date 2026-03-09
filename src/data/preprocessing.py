@@ -86,8 +86,8 @@ def time_series_split(
         raise ValueError("train_ratio results in empty or test split.")
     
     # -----------Chronological split-------------
-    X_train, X_test = X[:split_idx],X[:split_idx:]
-    y_train, y_test = y[:split_idx],y[:split_idx:]
+    X_train, X_test = X[:split_idx], X[split_idx:]
+    y_train, y_test = y[:split_idx], y[split_idx:]
     dates_train, dates_test = dates[:split_idx],dates[split_idx:]
 
     return X_train, X_test, y_train, y_test, dates_train, dates_test

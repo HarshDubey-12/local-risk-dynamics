@@ -82,9 +82,29 @@ class MonteCarloLinearRegression(LocalRiskModel):
         self.y_train_: np.ndarray | None = None
         self.n_features_: int | None = None
         self.is_fitted_: bool = False
+        self.coefs_: np.ndarray | None = None
 
         # Internal RNG
         self._rng = np.random.default_rng(random_state)
+
+    def _simulate_coefficients(self) -> np.ndarray:
+        """Draw Monte Carlo subsamples and fit one OLS model per draw."""
+        n_train = self.X_train_.shape[0]
+        n_coef = self.n_features_ + (1 if self.fit_intercept else 0)
+        coefs = np.zeros((self.n_simulations, n_coef))
+
+        for k in range(self.n_simulations):
+            indices = self._rng.choice(
+                n_train,
+                size=self.subsample_size,
+                replace=False,
+            )
+            X_sub = self.X_train_[indices]
+            y_sub = self.y_train_[indices]
+            X_sub_design = self._add_intercept(X_sub)
+            coefs[k] = np.linalg.pinv(X_sub_design) @ y_sub
+
+        return coefs
 
     # ------------------------------------------------------------------
     # Internal Utilities
@@ -129,6 +149,7 @@ class MonteCarloLinearRegression(LocalRiskModel):
         self.X_train_ = X
         self.y_train_ = y
         self.n_features_ = X.shape[1]
+        self.coefs_ = self._simulate_coefficients()
         self.is_fitted_ = True
 
         return self
@@ -159,30 +180,10 @@ class MonteCarloLinearRegression(LocalRiskModel):
         # Precompute test design matrix
         X_test_design = self._add_intercept(X)
 
-        # Monte Carlo loop
-        for k in range(self.n_simulations):
+        if self.coefs_ is None or self.coefs_.shape[0] != self.n_simulations:
+            self.coefs_ = self._simulate_coefficients()
 
-            # Sample indices without replacement
-            # draw without replacement using utility helper
-            from ..utils.sampling import subsample_indices
-            indices = subsample_indices(
-                self.X_train_.shape[0],
-                self.subsample_size,
-                replace=False,
-                random_state=self.random_state if self.random_state is not None else None,
-            )
-
-            # Create subsample
-            X_sub = self.X_train_[indices]
-            y_sub = self.y_train_[indices]
-
-            # Build design matrix for subsample
-            X_sub_design = self._add_intercept(X_sub)
-
-            # Solve OLS via pseudo-inverse
-            beta = np.linalg.pinv(X_sub_design) @ y_sub
-
-            # Predict
+        for k, beta in enumerate(self.coefs_):
             predictions[k] = X_test_design @ beta
 
         # Aggregate

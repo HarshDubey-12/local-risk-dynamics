@@ -33,18 +33,10 @@ class HyperparameterSweep:
             for param, value in config_dict.items():
                 setattr(model_config, param, value)
 
-            runner = ExperimentRunner(config)
+            runner = ExperimentRunner(self.base_config)
+            runner.config = config
             result = runner.run()
             result["hyperparams"] = str(config_dict)
             results.append(result)
 
         return pd.concat(results, ignore_index=True)
-    
-# usage
-sweep = HyperparameterSweep("experiments/config_baseline.yaml")
-results = sweep.sweep(
-    "lwlr", 
-    {"bandwidth": [0.5,1.0,2.0,5.0]}
-)
-best_bw = results.groupby("hyperparams")["rmse"].mean()
-print(f"Best Bandwidth: {best_bw}")

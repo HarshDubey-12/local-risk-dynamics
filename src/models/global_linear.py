@@ -42,8 +42,8 @@ class GlobalLinearRegression(LocalRiskModel):
         Indicates whether the model has been fitted.
     
     """
-    def __init__(self, fit_inetercept : bool = True)-> None:
-        self.fit_intercept = fit_inetercept
+    def __init__(self, fit_intercept: bool = True) -> None:
+        self.fit_intercept = fit_intercept
 
         # Attributes set during fitting 
         self.coef_: np.ndarray | None = None 

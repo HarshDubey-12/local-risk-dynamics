@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import hashlib 
 import numpy as np
 import pandas as pd 
+from .loader import load_fama_french
 
 @dataclass
 class Dataset:
@@ -42,20 +43,18 @@ class DataPipeline:
         """Load with hash-based caching."""
         path = Path(path)
         source_hash = self._get_file_hash(path)
-        cache_file = self.cache_dir / f"ff_cache_{source_hash}.npz"
-
-        if cache_file.exists():
-            return self._load_cache(cache_file)
         
-        # Load, preprocess, cache
-        df = pd.read_csv(path, skiprows = 3)
-        # Extract components
-        dates = pd.to_datetime(df.index)
-        feature_names = df.columns.tolist()
-        X = df.values
-        y = df.iloc[:, -1].values  # Last column as target
-
-        dataset = Dataset(X, y, dates, feature_names, {"raw_source": str(path)}, source_hash)
+        # Use the canonical loader to produce consistent features/targets.
+        X, y, dates = load_fama_french(path)
+        feature_names = ["Mkt-RF", "SMB", "HML", "RMW", "CMA"]
+        dataset = Dataset(
+            X=X,
+            y=y,
+            dates=dates,
+            feature_names=feature_names,
+            split_metadata={"raw_source": str(path)},
+            source_hash=source_hash,
+        )
         return dataset 
     
     def _get_file_hash(self, path: Path) -> str:
