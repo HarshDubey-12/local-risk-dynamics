@@ -161,10 +161,13 @@ class MonteCarloLinearRegression:
         for k in range(self.n_simulations):
 
             # Sample indices without replacement
-            indices = self._rng.choice(
+            # draw without replacement using utility helper
+            from ..utils.sampling import subsample_indices
+            indices = subsample_indices(
                 self.X_train_.shape[0],
-                size=self.subsample_size,
+                self.subsample_size,
                 replace=False,
+                random_state=self.random_state if self.random_state is not None else None,
             )
 
             # Create subsample

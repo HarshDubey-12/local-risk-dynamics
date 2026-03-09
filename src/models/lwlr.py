@@ -17,18 +17,27 @@ from __future__ import annotations
 import numpy as np
 from typing import Optional
 
+from ..utils.kernels import GaussianKernel, Kernel
+
 
 class LocallyWeightedLinearRegression:
     """
     Gaussian Kernel Locally Weighted Linear Regression (LWLR).
     """
 
-    def __init__(self, bandwidth: float, fit_intercept: bool = True) -> None:
+    def __init__(
+        self,
+        bandwidth: float,
+        fit_intercept: bool = True,
+        kernel: Kernel | None = None,
+    ) -> None:
         if bandwidth <= 0:
             raise ValueError("bandwidth must be strictly positive.")
 
         self.bandwidth = float(bandwidth)
         self.fit_intercept = fit_intercept
+        # allow custom kernel; default to Gaussian
+        self.kernel = kernel if kernel is not None else GaussianKernel(self.bandwidth)
 
         self.X_train_: Optional[np.ndarray] = None
         self.y_train_: Optional[np.ndarray] = None
@@ -47,10 +56,6 @@ class LocallyWeightedLinearRegression:
         if not self.is_fitted_:
             raise RuntimeError("Model must be fitted before prediction.")
 
-    def _gaussian_kernel(self, X: np.ndarray, x0: np.ndarray) -> np.ndarray:
-        diff = X - x0
-        dist_sq = np.sum(diff ** 2, axis=1)
-        return np.exp(-dist_sq / (2 * self.bandwidth ** 2))
 
     # --------------------------------------------------------------
 
@@ -90,7 +95,7 @@ class LocallyWeightedLinearRegression:
         y_pred = np.zeros(X_query.shape[0])
 
         for i, x0 in enumerate(X_query):
-            weights = self._gaussian_kernel(X_train, x0)
+            weights = self.kernel(X_train, x0)
 
             # Avoid explicit diagonal matrix
             W = weights[:, np.newaxis]

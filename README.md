@@ -357,9 +357,6 @@ local-risk-dynamics/
       lwlr.py
       mc_linear.py
       mcllr.py
-    optimization/
-      sgd.py
-      closed_form.py
     evaluation/
       metrics.py
       backtesting.py
