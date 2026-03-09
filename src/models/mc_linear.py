@@ -16,7 +16,9 @@ from __future__ import annotations
 import numpy as np
 
 
-class MonteCarloLinearRegression:
+from ..models.base import LocalRiskModel
+
+class MonteCarloLinearRegression(LocalRiskModel):
     """
     Stochastic subsampling and prediction ensembling.
 
@@ -211,3 +213,26 @@ class MonteCarloLinearRegression:
         mse = np.mean((y - y_pred) ** 2)
 
         return float(mse)
+
+    # --------------------------------------------------------------
+    # Interface compliance
+    # --------------------------------------------------------------
+
+    @property
+    def is_fitted(self) -> bool:
+        return self.is_fitted_
+
+    @property
+    def model_name(self) -> str:
+        return "mc_linear"
+
+    @property
+    def hyperparameters(self) -> dict:
+        return {
+            "n_simulations": self.n_simulations,
+            "subsample_size": self.subsample_size,
+            "fit_intercept": self.fit_intercept,
+        }
+
+    def predict_with_uncertainty(self, X: np.ndarray):
+        return self.predict(X, return_std=True)

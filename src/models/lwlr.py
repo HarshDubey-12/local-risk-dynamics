@@ -20,7 +20,9 @@ from typing import Optional
 from ..utils.kernels import GaussianKernel, Kernel
 
 
-class LocallyWeightedLinearRegression:
+from ..models.base import LocalRiskModel
+
+class LocallyWeightedLinearRegression(LocalRiskModel):
     """
     Gaussian Kernel Locally Weighted Linear Regression (LWLR).
     """
@@ -118,3 +120,22 @@ class LocallyWeightedLinearRegression:
 
         y_pred = self.predict(X)
         return float(np.mean((y - y_pred) ** 2))
+
+    # --------------------------------------------------------------
+    # Interface compliance
+    # --------------------------------------------------------------
+
+    @property
+    def is_fitted(self) -> bool:
+        return self.is_fitted_
+
+    @property
+    def model_name(self) -> str:
+        return "lwlr"
+
+    @property
+    def hyperparameters(self) -> dict:
+        return {"bandwidth": self.bandwidth, "fit_intercept": self.fit_intercept}
+
+    def predict_with_uncertainty(self, X: np.ndarray):
+        return self.predict(X), None

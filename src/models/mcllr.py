@@ -12,7 +12,9 @@ It produces uncertainty-aware, locally adaptive predictions for non-stationary f
 
 import numpy as np
 
-class MonteCarloLocalLinearRegression:
+from ..models.base import LocalRiskModel
+
+class MonteCarloLocalLinearRegression(LocalRiskModel):
     """
     Monte Carlo Local Linear Regression (MCLLR).
 
@@ -306,3 +308,27 @@ class MonteCarloLocalLinearRegression:
         mse = np.mean((y - y_pred) ** 2)
 
         return float(mse)
+
+    # --------------------------------------------------------------
+    # Interface compliance
+    # --------------------------------------------------------------
+
+    @property
+    def is_fitted(self) -> bool:
+        return self.is_fitted_
+
+    @property
+    def model_name(self) -> str:
+        return "mcllr"
+
+    @property
+    def hyperparameters(self) -> dict:
+        return {
+            "bandwidth": self.bandwidth,
+            "n_simulations": self.n_simulations,
+            "subsample_size": self.subsample_size,
+            "fit_intercept": self.fit_intercept,
+        }
+
+    def predict_with_uncertainty(self, X: np.ndarray):
+        return self.predict(X, return_std=True)

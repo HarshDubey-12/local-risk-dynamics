@@ -53,36 +53,68 @@ class TestModels:
         X_train, X_test, y_train, y_test = sample_data
         model = GlobalLinearRegression()
         model.fit(X_train, y_train)
+        # interface
+        assert model.is_fitted
+        assert isinstance(model.model_name, str)
+        assert isinstance(model.hyperparameters, dict)
+
         y_pred = model.predict(X_test)
         assert y_pred.shape == y_test.shape
         assert model.score(X_test, y_test) > 0  # basic sanity
+        # uncertainty api
+        y_pred2, y_std = model.predict_with_uncertainty(X_test[:5])
+        assert y_pred2.shape == (5,)
+        assert y_std is None
 
     def test_lwlr(self, sample_data):
         X_train, X_test, y_train, y_test = sample_data
         model = LocallyWeightedLinearRegression(bandwidth=1.0)
         model.fit(X_train, y_train)
+        assert model.is_fitted
+        assert isinstance(model.model_name, str)
+        assert isinstance(model.hyperparameters, dict)
+
         y_pred = model.predict(X_test[:10])  # test subset
         assert y_pred.shape == (10,)
         assert model.score(X_test[:10], y_test[:10]) > 0
+        y_pred2, y_std = model.predict_with_uncertainty(X_test[:5])
+        assert y_pred2.shape == (5,)
+        assert y_std is None
 
     def test_mc_linear(self, sample_data):
         X_train, X_test, y_train, y_test = sample_data
         model = MonteCarloLinearRegression(n_simulations=5, subsample_size=20, random_state=42)
         model.fit(X_train, y_train)
+        assert model.is_fitted
+        assert isinstance(model.model_name, str)
+        assert isinstance(model.hyperparameters, dict)
+
         y_pred, y_std = model.predict(X_test[:5], return_std=True)
         assert y_pred.shape == (5,)
         assert y_std.shape == (5,)
         assert np.all(y_std >= 0)
+        # stochastic predictions change each call; just verify shape
+        y_pred2, y_std2 = model.predict_with_uncertainty(X_test[:5])
+        assert y_pred2.shape == (5,)
+        assert y_std2.shape == (5,)
 
     def test_mcllr(self, sample_data):
         X_train, X_test, y_train, y_test = sample_data
         model = MonteCarloLocalLinearRegression(bandwidth=1.0, n_simulations=5, subsample_size=20, random_state=42)
         model.fit(X_train, y_train)
+        assert model.is_fitted
+        assert isinstance(model.model_name, str)
+        assert isinstance(model.hyperparameters, dict)
+
         y_pred, y_std = model.predict(X_test[:5], return_std=True)
         assert y_pred.shape == (5,)
         assert y_std.shape == (5,)
         assert np.all(y_std >= 0)
         assert model.score(X_test[:5], y_test[:5]) > 0
+        # results vary due to randomness
+        y_pred2, y_std2 = model.predict_with_uncertainty(X_test[:5])
+        assert y_pred2.shape == (5,)
+        assert y_std2.shape == (5,)
 
 
 class TestMetrics:
