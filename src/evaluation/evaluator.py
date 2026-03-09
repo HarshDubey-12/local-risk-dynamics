@@ -60,6 +60,11 @@ class Evaluator:
         if y_unc is not None:
             metrics["coverage_95"] = metrics_module.coverage_95(y_test, y_pred, y_unc)
             metrics["avg_std"] = metrics_module.avg_std(y_unc)
+            metrics["interval_width_95"] = metrics_module.interval_width_95(y_unc)
+            metrics["gaussian_nll"] = metrics_module.gaussian_nll(y_test, y_pred, y_unc)
+            metrics["interval_score_95"] = metrics_module.interval_score_95(
+                y_test, y_pred, y_unc
+            )
 
         # compute any extras provided by caller
         if extra_metrics:

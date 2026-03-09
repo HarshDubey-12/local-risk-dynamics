@@ -4,6 +4,8 @@ from .global_linear import GlobalLinearRegression
 from .lwlr import LocallyWeightedLinearRegression
 from .mc_linear import MonteCarloLinearRegression
 from .mcllr import MonteCarloLocalLinearRegression
+from .mcllr_ablations import MCLLRNoGeometry, MCLLRNoStochasticity
+from .ridge_linear import RidgeLinearRegression
 from ..config import ModelCofig
 
 class Modelfactory:
@@ -14,6 +16,9 @@ class Modelfactory:
         "lwlr": LocallyWeightedLinearRegression,
         "mc_linear": MonteCarloLinearRegression,
         "mcllr": MonteCarloLocalLinearRegression,
+        "mcllr_no_geometry": MCLLRNoGeometry,
+        "mcllr_no_stochasticity": MCLLRNoStochasticity,
+        "ridge_linear": RidgeLinearRegression,
     }
 
     @classmethod
@@ -47,6 +52,24 @@ class Modelfactory:
                 "subsample_size": config.subsample_size,
                 "fit_intercept": config.fit_intercept,
                 "random_state": config.random_state,
+            }
+        elif config.model_type == "mcllr_no_geometry":
+            kwargs = {
+                "n_simulations": config.n_simulations,
+                "subsample_size": config.subsample_size,
+                "fit_intercept": config.fit_intercept,
+                "random_state": config.random_state,
+            }
+        elif config.model_type == "mcllr_no_stochasticity":
+            kwargs = {
+                "bandwidth": config.bandwidth,
+                "subsample_size": config.subsample_size,
+                "fit_intercept": config.fit_intercept,
+            }
+        elif config.model_type == "ridge_linear":
+            kwargs = {
+                "alpha": config.alpha if config.alpha is not None else 1.0,
+                "fit_intercept": config.fit_intercept,
             }
         else:
             raise ValueError(f"Unknown model: {config.model_type}")

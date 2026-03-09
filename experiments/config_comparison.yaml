@@ -1,0 +1,32 @@
+dataset_path: data/raw/F-F_Research_Data_5_Factors_2x3.csv
+train_ratio: 0.8
+random_state: 42
+models:
+  - model_type: global_linear
+    fit_intercept: true
+  - model_type: ridge_linear
+    fit_intercept: true
+    alpha: 1.0
+  - model_type: lwlr
+    fit_intercept: true
+    bandwidth: 1.0
+  - model_type: mc_linear
+    fit_intercept: true
+    n_simulations: 50
+    subsample_size: 80
+    random_state: 42
+  - model_type: mcllr
+    fit_intercept: true
+    bandwidth: 1.0
+    n_simulations: 50
+    subsample_size: 80
+    random_state: 42
+  - model_type: mcllr_no_geometry
+    fit_intercept: true
+    n_simulations: 50
+    subsample_size: 80
+    random_state: 42
+  - model_type: mcllr_no_stochasticity
+    fit_intercept: true
+    bandwidth: 1.0
+    subsample_size: 80

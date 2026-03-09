@@ -6,20 +6,31 @@ from pathlib import Path
 @dataclass
 class ModelCofig:
     """Configuration for any model in the framework."""
-    model_type: Literal["global_linear", "lwlr","mc_linear", "mcllr"]
+    model_type: Literal[
+        "global_linear",
+        "lwlr",
+        "mc_linear",
+        "mcllr",
+        "mcllr_no_geometry",
+        "mcllr_no_stochasticity",
+        "ridge_linear",
+    ]
     fit_intercept: bool = True
     random_state: int | None = None
     # Model specific params
     bandwidth: float | None = None # LWLR, MCLLR
     n_simulations: int | None = None # MC, MCLLR
     subsample_size: int | None = None # MC, MCLLR
+    alpha: float | None = None # Ridge baseline
 
     def __post_init__(self):
         # validate based on model_type 
         if self.model_type == "lwlr" and self.bandwidth is None:
             raise ValueError("Bandwidth is required for LWLR")
-        if self.model_type in ["mc_linear","mcllr"] and self.n_simulations is None:
+        if self.model_type in ["mc_linear","mcllr", "mcllr_no_geometry"] and self.n_simulations is None:
             raise ValueError(f"n_simulations is required for {self.model_type}")
+        if self.model_type in ["mc_linear", "mcllr", "mcllr_no_geometry", "mcllr_no_stochasticity"] and self.subsample_size is None:
+            raise ValueError(f"subsample_size is required for {self.model_type}")
         
     @classmethod
     def from_yaml(cls, path:str | Path) -> "ModelCofig":

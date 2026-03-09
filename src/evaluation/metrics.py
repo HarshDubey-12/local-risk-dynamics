@@ -62,3 +62,29 @@ def avg_std(y_std: np.ndarray) -> float:
     """Mean of per-sample standard deviations."""
     return float(np.mean(y_std))
 
+
+def interval_width_95(y_std: np.ndarray) -> float:
+    """Average width of a nominal 95% predictive interval."""
+    return float(np.mean(2 * 1.96 * y_std))
+
+
+def gaussian_nll(y_true: np.ndarray, y_pred: np.ndarray, y_std: np.ndarray) -> float:
+    """Gaussian negative log-likelihood using model mean and std."""
+    sigma = np.maximum(np.asarray(y_std, dtype=float), 1e-8)
+    residual = np.asarray(y_true, dtype=float) - np.asarray(y_pred, dtype=float)
+    nll = 0.5 * np.log(2 * np.pi * sigma**2) + 0.5 * (residual**2) / (sigma**2)
+    return float(np.mean(nll))
+
+
+def interval_score_95(
+    y_true: np.ndarray, y_pred: np.ndarray, y_std: np.ndarray, alpha: float = 0.05
+) -> float:
+    """Proper interval score for central (1-alpha) intervals; lower is better."""
+    z = 1.96
+    lower = y_pred - z * y_std
+    upper = y_pred + z * y_std
+    width = upper - lower
+    below_penalty = (2.0 / alpha) * np.maximum(lower - y_true, 0.0)
+    above_penalty = (2.0 / alpha) * np.maximum(y_true - upper, 0.0)
+    return float(np.mean(width + below_penalty + above_penalty))
+

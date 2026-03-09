@@ -335,6 +335,155 @@ Experimental Goals
 - Uncertainty calibration
 - Robustness to non-stationarity
 
+Validation Roadmap (Implemented)
+The following checklist converts the research hypothesis into code-level validation steps.
+
+- [x] Rolling non-stationary evaluation
+- [x] Time-series hyperparameter tuning
+- [x] MCLLR ablation analysis
+- [x] Uncertainty quality metrics
+- [x] Stronger regularized baseline
+
+1) Rolling non-stationary evaluation
+Theory
+- A single fixed train/test split can hide regime sensitivity.
+- Walk-forward folds test whether performance remains stable as regimes shift.
+
+Programming
+- Module: `src/evaluation/rolling.py`
+- Key APIs:
+  - `walk_forward_splits(...)`
+  - `evaluate_walk_forward(...)`
+  - `rolling_results_to_frame(...)`
+  - `summarize_rolling_metrics(...)`
+
+Example
+```python
+from src.evaluation.rolling import evaluate_walk_forward, rolling_results_to_frame
+
+folds = evaluate_walk_forward(
+    model_builder=lambda: model,
+    X=X,
+    y=y,
+    train_window=240,
+    test_window=24,
+    step=24,
+)
+df_folds = rolling_results_to_frame(folds)
+```
+
+2) Time-series hyperparameter tuning
+Theory
+- Hyperparameters (`tau`, `m`, `r`) must be selected using chronological validation,
+  not random splits, to avoid leakage and over-optimistic selection.
+
+Programming
+- Module: `src/Experiments/tuning.py`
+- API: `tune_model_with_walk_forward(...)`
+
+Example
+```python
+from src.config import ModelCofig
+from src.Experiments.tuning import tune_model_with_walk_forward
+
+leaderboard, best = tune_model_with_walk_forward(
+    base_model_config=ModelCofig(
+        model_type="mcllr",
+        bandwidth=1.0,
+        n_simulations=50,
+        subsample_size=80,
+        fit_intercept=True,
+        random_state=42,
+    ),
+    param_grid={
+        "bandwidth": [0.5, 1.0, 2.0],
+        "subsample_size": [50, 80, 120],
+        "n_simulations": [30, 50],
+    },
+    X=X,
+    y=y,
+    train_window=240,
+    test_window=24,
+    objective_metric="rmse",
+)
+```
+
+3) MCLLR ablation analysis
+Theory
+- To validate the claim "geometric + stochastic locality is necessary",
+  each component must be removed and compared.
+
+Programming
+- Models added:
+  - `mcllr_no_geometry` (stochastic sampling only)
+  - `mcllr_no_stochasticity` (deterministic local subset only)
+- File: `src/models/mcllr_ablations.py`
+- Factory support: `src/models/factory.py`
+
+Interpretation
+- If full `mcllr` consistently outperforms both ablations in rolling tests,
+  the core thesis is empirically supported.
+
+4) Uncertainty quality metrics
+Theory
+- Uncertainty-aware modeling is not only "having a std output".
+- It must be calibrated and decision-useful.
+
+Programming
+- Added metrics in `src/evaluation/metrics.py`:
+  - `coverage_95`
+  - `interval_width_95`
+  - `gaussian_nll`
+  - `interval_score_95`
+- Integrated into `src/evaluation/evaluator.py` for all models that return uncertainty.
+
+5) Stronger regularized baseline
+Theory
+- A stronger linear baseline prevents over-claiming MCLLR gains over weak comparators.
+- Ridge is a robust baseline under multicollinearity and noisy factors.
+
+Programming
+- Model: `ridge_linear`
+- File: `src/models/ridge_linear.py`
+- Config support in `src/config.py` and `src/models/factory.py`
+
+6) End-to-end rolling experiment runner
+Programming
+- Module: `src/Experiments/rolling_runner.py`
+- Runs all models from one config over walk-forward folds.
+
+Example
+```python
+from src.Experiments.rolling_runner import RollingExperimentRunner
+
+runner = RollingExperimentRunner(
+    "experiments/config_comparison.yaml",
+    train_window=240,
+    test_window=24,
+    step=24,
+)
+fold_df, summary_df = runner.run()
+```
+
+7) Unified experiment config for claim testing
+Programming
+- File: `experiments/config_comparison.yaml`
+- Includes:
+  - `global_linear`
+  - `ridge_linear`
+  - `lwlr`
+  - `mc_linear`
+  - `mcllr`
+  - `mcllr_no_geometry`
+  - `mcllr_no_stochasticity`
+
+Practical criterion for claim acceptance
+- Full MCLLR should:
+  - win on rolling `rmse/mae` mean across folds,
+  - maintain competitive variance (`std`) across folds,
+  - show credible uncertainty quality (`coverage_95`, lower interval score/NLL),
+  - outperform both ablations consistently.
+
 Project Structure
 ```
 local-risk-dynamics/
