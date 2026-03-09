@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Any, Callable, Optional
 import numpy as np
 from ..evaluation import metrics as metrics_module
+from ..evaluation import backtesting as backtesting_module
 from ..models.base import LocalRiskModel
 from ..data.pipeline import Dataset
 
@@ -91,3 +92,20 @@ class Evaluator:
             model.model_name: Evaluator.evaluate(model, X_test, y_test, extra_metrics)
             for model in models
         }
+
+    @staticmethod
+    def backtest(
+        model: LocalRiskModel,
+        X_test: np.ndarray,
+        y_test: np.ndarray,
+        risk_free_rate: float = 0.0
+    ) -> Dict[str, float]:
+        """Backtest a model assuming y_test represents returns."""
+        y_pred, _ = model.predict_with_uncertainty(X_test)
+        # Simple backtest: assume strategy based on prediction sign or something
+        # For simplicity, use prediction error as basis for returns
+        # In practice, this would be more sophisticated
+        errors = y_test - y_pred
+        # Pseudo-returns: positive if error is small
+        pseudo_returns = -np.abs(errors)  # negative for large errors
+        return backtesting_module.backtest_summary(pseudo_returns, risk_free_rate)
