@@ -111,3 +111,6 @@ dmypy.json
 # Data files
 data/processed/
 figures/
+
+# Generated browser profile junk from print bundle creation
+print_bundle/chrome_profile/
