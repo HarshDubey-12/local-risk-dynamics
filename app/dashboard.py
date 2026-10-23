@@ -31,7 +31,8 @@ from app.views import comparison, data_analysis, models, overview  # noqa: E402
 def run() -> None:
     st.set_page_config(page_title="Local Risk Dynamics", page_icon="📈", layout="wide")
     pages = {
-        "overview": st.Page(overview.render, title="Project overview", icon="🏠", url_path="overview", default=True),
+        # The default page is always served at "/", so it takes no url_path.
+        "overview": st.Page(overview.render, title="Project overview", icon="🏠", default=True),
         "data": st.Page(data_analysis.render, title="Data analysis", icon="🔎", url_path="data"),
         "models": st.Page(models.render, title="Models", icon="🧠", url_path="models"),
         "comparison": st.Page(comparison.render, title="Comparison", icon="⚖️", url_path="comparison"),

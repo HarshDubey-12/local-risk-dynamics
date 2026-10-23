@@ -42,8 +42,8 @@ def test_catalog_covers_every_default_model():
 
 def test_overview_headline_and_cards():
     at = _run("overview")
-    labels = [m.label for m in at.metric]
-    assert "Best model" in labels
+    assert any(m.value.startswith("Best model: **MCLLR (improved)**") for m in at.markdown)
+    assert "OOS R² vs historical mean" in [m.label for m in at.metric]
     assert len([b for b in at.button if b.label == "Open model →"]) == len(MODELS)
 
 

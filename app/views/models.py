@@ -53,18 +53,21 @@ def _widget(name: str, kind: str, options, default, key: str):
 def _settings_form(key: str, info: dict, default_run: cmp.ModelRun):
     """Render the custom-settings form; returns (params, tuned, grid, protocol) or None until submitted."""
     system, model_type = default_run.system, default_run.model_type
+    params, grid, tuned, protocol = {}, {}, False, "walk_forward"
+    # Mode switches live outside the form: they change which inputs the form shows,
+    # and widgets inside a form do not rerun the page until it is submitted.
+    if system == "standard":
+        evaluation = st.radio("Evaluation", ["Walk-forward (shared folds)", "Hold-out 80/20 (secondary view)"],
+                              horizontal=True, key=f"proto_{key}")
+        protocol = "holdout" if evaluation.startswith("Hold") else "walk_forward"
+    elif model_type in IMPROVED_GRID:
+        tuned = st.radio("Hyperparameters", ["Tuned per fold (nested walk-forward)", "Fixed values"],
+                         horizontal=True, key=f"mode_{key}").startswith("Tuned")
     with st.form(f"settings_{key}"):
-        params, grid, tuned, protocol = {}, {}, False, "walk_forward"
         if system == "standard":
-            evaluation = st.radio("Evaluation", ["Walk-forward (shared folds)", "Hold-out 80/20 (secondary view)"],
-                                  horizontal=True, key=f"proto_{key}")
-            protocol = "holdout" if evaluation.startswith("Hold") else "walk_forward"
             for name, kind, options, default in STANDARD_SETTINGS[model_type]:
                 params[name] = _widget(name, kind, options, default_run.params.get(name, default), f"{key}_{name}")
         else:
-            if model_type in IMPROVED_GRID:
-                tuned = st.radio("Hyperparameters", ["Tuned per fold (nested walk-forward)", "Fixed values"],
-                                 horizontal=True, key=f"mode_{key}").startswith("Tuned")
             for name, kind, options, default in IMPROVED_FIXED[model_type]:
                 if tuned and name in IMPROVED_GRID[model_type]:
                     defaults = default_run.params.get("grid", {}).get(name, IMPROVED_GRID[model_type][name][:3])
@@ -268,7 +271,8 @@ def render() -> None:
     tabs = dict(zip(tab_names, st.tabs(tab_names)))
 
     with tabs["Forecasts"]:
-        st.altair_chart(charts.predictions_over_time(run, label), use_container_width=True)
+        title = info["label"] + (" (custom settings)" if source.startswith("Custom") else "")
+        st.altair_chart(charts.predictions_over_time(run, title), use_container_width=True)
         st.caption("Dots are actual monthly returns; the line is the forecast"
                    + (" with its 95% band (green = inside)." if run.has_uncertainty else "."))
     with tabs["Diagnostics"]:

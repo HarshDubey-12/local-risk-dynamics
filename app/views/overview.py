@@ -10,13 +10,15 @@ from lrd import comparison as cmp
 
 PIPELINE_DIAGRAM = """
 digraph {
-  rankdir=LR; bgcolor="transparent"; compound=true;
+  rankdir=TB; bgcolor="transparent"; compound=true; nodesep=0.35; ranksep=0.35;
   node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, color="#4c78a8", fillcolor="#eef3fb"];
   edge [color="#888888"];
-  subgraph cluster_core { label="Shared core (lrd.core)"; fontname="Helvetica"; fontsize=11; color="#bbbbbb"; style="rounded";
+  subgraph cluster_core { label="Shared core: data (lrd.core)"; fontname="Helvetica"; fontsize=11; color="#bbbbbb"; style="rounded";
     validate [label="1. Validate raw data\\nmissing · garbage · duplicates · gaps"];
     load [label="2. Load\\nX = factors at t\\ny = Mkt-RF at t+1"];
     folds [label="3. Walk-forward folds\\n240-month train · 12-month test"];
+  }
+  subgraph cluster_eval { label="Shared core: evaluation (lrd.core)"; fontname="Helvetica"; fontsize=11; color="#bbbbbb"; style="rounded";
     evaluate [label="6. Evaluate\\nRMSE · OOS R² · DM test · calibration"];
   }
   subgraph cluster_std { label="Standard system (lrd.standard)"; fontname="Helvetica"; fontsize=11; color="#bbbbbb"; style="rounded";
@@ -66,9 +68,10 @@ def render() -> None:
         best = summary["oos_r2_%"].idxmax()
         with st.container(border=True):
             st.markdown("**Headline result** (shared walk-forward folds)")
+            st.markdown(f"Best model: **{MODELS[best]['label']}**")  # text, not a metric tile: names would be truncated
             c1, c2 = st.columns(2)
-            c1.metric("Best model", MODELS[best]["label"])
-            c2.metric("OOS R² vs historical mean", f"{summary.loc[best, 'oos_r2_%']:+.2f}%")
+            c1.metric("OOS R² vs historical mean", f"{summary.loc[best, 'oos_r2_%']:+.2f}%")
+            c2.metric("DM p-value vs mean", f"{summary.loc[best, 'dm_p']:.2f}")
             c3, c4 = st.columns(2)
             c3.metric("Original MCLLR", f"{summary.loc['standard:mcllr', 'oos_r2_%']:+.2f}%")
             c4.metric("Improved MCLLR coverage", f"{summary.loc['improved:mcllr_improved', 'coverage_95']:.0%}")
@@ -79,7 +82,8 @@ def render() -> None:
 
     # ---------------------------------------------------------- methodology
     st.header("Methodology")
-    st.graphviz_chart(PIPELINE_DIAGRAM, use_container_width=True)
+    _, middle, _ = st.columns([1, 3, 1])  # keep the tall diagram at a readable size on wide screens
+    middle.graphviz_chart(PIPELINE_DIAGRAM, use_container_width=True)
     st.caption(
         "Both systems share data loading, folds and evaluation, so every model is scored on identical months "
         "with identical metric definitions. Only model preparation and fitting differ."
