@@ -1,4 +1,10 @@
-# MCLLR proposed experiment configuration (placeholder)
-dataset: data/raw/F-F_Research_Data_5_Factors_2x3.csv
-model: mcllr
-params: {}
+# MCLLR proposed experiment configuration (bandwidth on the decimal-return scale)
+dataset_path: data/raw/F-F_Research_Data_5_Factors_2x3.csv
+train_ratio: 0.8
+random_state: 42
+models:
+  - model_type: mcllr
+    fit_intercept: true
+    bandwidth: 0.08
+    n_simulations: 50
+    subsample_size: 80

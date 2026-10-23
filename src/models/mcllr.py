@@ -174,23 +174,44 @@ class MonteCarloLocalLinearRegression(LocalRiskModel):
         Returns
         -------
         weights : np.ndarray of shape (n_train,)
-            Raw (unnormalized) kernel weights.
+            Unnormalized kernel weights, scaled so the nearest training
+            point has weight 1.
         """
 
         if x0.ndim != 1:
             raise ValueError("x0 must be a 1D array")
-        
+
         if x0.shape[0] != self.n_features_:
             raise ValueError(f"Expected {self.n_features_} features, got {x0.shape[0]}")
-        
+
         # Compute squared Euclidean distances (no square root for numerical stability)
         diff = self.X_train_ - x0
         sq_dist = np.sum(diff ** 2, axis=1)
 
         # Gaussian kernel: w_i(x0) = exp(-||x_i - x0||^2 / (2*tau^2))
-        weights = np.exp(-sq_dist / (2 * self.bandwidth ** 2))
+        # Shifting by the minimum distance only rescales the weights (the
+        # normalized probabilities are unchanged) but stops them all
+        # underflowing to zero for small bandwidths or outlying queries.
+        weights = np.exp(-(sq_dist - sq_dist.min()) / (2 * self.bandwidth ** 2))
 
         return weights
+
+    def _sampling_probabilities(self, weights: np.ndarray) -> np.ndarray:
+        """
+        Convert kernel weights into a valid sampling distribution.
+
+        Guarantees the probabilities sum to 1 and that at least
+        ``subsample_size`` entries are non-zero, as required for sampling
+        without replacement. When fewer points carry non-zero weight, a tiny
+        floor is added so the remaining points can fill the neighborhood.
+        """
+        probabilities = weights / np.sum(weights)
+
+        if np.count_nonzero(probabilities) < self.subsample_size:
+            probabilities = np.maximum(probabilities, 1e-12)
+            probabilities = probabilities / np.sum(probabilities)
+
+        return probabilities
 
     # ------------------------------------------------------------------
     # Predict  
@@ -205,7 +226,7 @@ class MonteCarloLocalLinearRegression(LocalRiskModel):
 
         For each test point x0:
           1. Compute kernel weights w_i(x0) = exp(-||x_i - x0||^2 / (2*tau^2))
-          2. Normalize to probabilities p_i = w_i / sum(w_i) + eps
+          2. Normalize to probabilities p_i = w_i / sum(w_i)
           3. For r=1 to n_simulations:
              a. Sample neighborhood S_r ~ w/o replacement(m, p)
              b. Fit plain OLS on S_r
@@ -242,7 +263,6 @@ class MonteCarloLocalLinearRegression(LocalRiskModel):
         n_test = X.shape[0]
         mean_predictions = np.zeros(n_test)
         std_predictions = np.zeros(n_test)
-        eps = 1e-12
 
         # Outer loop over test points (query-dependent locality)
         for i in range(n_test):
@@ -252,8 +272,7 @@ class MonteCarloLocalLinearRegression(LocalRiskModel):
             weights = self._compute_kernel_weights(x0)
 
             # Step 2: Normalize to probabilities (critical bridge)
-            weight_sum = np.sum(weights)
-            probabilities = weights / (weight_sum + eps)
+            probabilities = self._sampling_probabilities(weights)
 
             # Store Monte Carlo predictions for aggregation
             simulation_preds = np.zeros(self.n_simulations)

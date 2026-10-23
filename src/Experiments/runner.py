@@ -12,8 +12,12 @@ from ..evaluation.evaluator import Evaluator
 class ExperimentRunner:
     """Orchestrate multi-model training and evaluation."""
 
-    def __init__(self, config_path: str | Path):
-        self.config = ExperimentConfig.from_yaml(config_path)
+    def __init__(self, config: str | Path | ExperimentConfig):
+        self.config = (
+            config
+            if isinstance(config, ExperimentConfig)
+            else ExperimentConfig.from_yaml(config)
+        )
         self.pipeline = DataPipeline()
         self.results = {}
 

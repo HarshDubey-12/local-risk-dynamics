@@ -114,3 +114,6 @@ figures/
 
 # Generated browser profile junk from print bundle creation
 print_bundle/chrome_profile/
+
+# Experiment tracker output
+experiments/logs/

@@ -1,24 +1,37 @@
+from dataclasses import replace
 from itertools import product
 from typing import Dict, List, Any
 from pathlib import Path
 import pandas as pd
 
-# Import the missing classes
 from ..config import ExperimentConfig
 from .runner import ExperimentRunner
 
 class HyperparameterSweep:
-    """Grid search over model congigurations."""
+    """Grid search over model configurations."""
 
-    def __init__(self, base_config_path: str | Path):
-        self.base_config = ExperimentConfig.from_yaml(base_config_path)
-    
+    def __init__(self, base_config: str | Path | ExperimentConfig):
+        self.base_config = (
+            base_config
+            if isinstance(base_config, ExperimentConfig)
+            else ExperimentConfig.from_yaml(base_config)
+        )
+
     def sweep(
             self,
-            model_type: str, 
+            model_type: str,
             param_grid: Dict[str, List[Any]]
     ) -> pd.DataFrame:
-        """Run all combinations of hyperparameters."""
+        """Run all combinations of hyperparameters for one model type.
+
+        Only the swept model is trained for each combination; the base
+        config is never modified.
+        """
+
+        matches = [m for m in self.base_config.models if m.model_type == model_type]
+        if not matches:
+            raise ValueError(f"Model type '{model_type}' not found in base config.")
+        base_model = matches[0]
 
         param_names = list(param_grid.keys())
         param_values = list(param_grid.values())
@@ -27,15 +40,13 @@ class HyperparameterSweep:
         for values in product(*param_values):
             config_dict = dict(zip(param_names, values))
 
-            # Create variant config
-            config = self.base_config
-            model_config = [m for m in config.models if m.model_type == model_type][0]
-            for param, value in config_dict.items():
-                setattr(model_config, param, value)
+            # Create variant config (replace re-runs validation on the new params)
+            config = replace(
+                self.base_config,
+                models=[replace(base_model, **config_dict)],
+            )
 
-            runner = ExperimentRunner(self.base_config)
-            runner.config = config
-            result = runner.run()
+            result = ExperimentRunner(config).run()
             result["hyperparams"] = str(config_dict)
             results.append(result)
 

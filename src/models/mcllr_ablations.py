@@ -98,7 +98,13 @@ class MCLLRNoGeometry(LocalRiskModel):
 
 
 class MCLLRNoStochasticity(LocalRiskModel):
-    """Ablation: geometric locality without stochastic neighborhood sampling."""
+    """Ablation: geometric locality without stochastic neighborhood sampling.
+
+    For each query, the ``subsample_size`` nearest training points are fitted
+    with Gaussian-kernel weighted least squares. The kernel weights play the
+    role MCLLR's sampling probabilities do, so ``bandwidth`` controls how
+    strongly the fit favours the closest points.
+    """
 
     def __init__(
         self,
@@ -140,7 +146,8 @@ class MCLLRNoStochasticity(LocalRiskModel):
     def _kernel_weights(self, x0: np.ndarray) -> np.ndarray:
         diff = self.X_train_ - x0
         sq_dist = np.sum(diff**2, axis=1)
-        return np.exp(-sq_dist / (2 * self.bandwidth**2))
+        # Shift by the minimum distance to avoid underflow; WLS is scale-invariant.
+        return np.exp(-(sq_dist - sq_dist.min()) / (2 * self.bandwidth**2))
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         if not self.is_fitted_:
@@ -152,11 +159,12 @@ class MCLLRNoStochasticity(LocalRiskModel):
         for i, x0 in enumerate(X):
             weights = self._kernel_weights(x0)
             idx = np.argsort(weights)[-self.subsample_size :]
+            sqrt_w = np.sqrt(weights[idx])[:, np.newaxis]
             X_sub = self._add_intercept(self.X_train_[idx])
             y_sub = self.y_train_[idx]
-            beta = np.linalg.pinv(X_sub) @ y_sub
+            beta = np.linalg.pinv(X_sub * sqrt_w) @ (y_sub * sqrt_w[:, 0])
             x0_design = self._add_intercept(x0.reshape(1, -1))
-            y_pred[i] = float(x0_design @ beta)
+            y_pred[i] = (x0_design @ beta).item()
         return y_pred
 
     @property
