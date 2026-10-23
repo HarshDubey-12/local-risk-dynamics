@@ -33,7 +33,26 @@ cd local-risk-dynamics
 # Install dependencies
 pip install -r requirements.txt
 
-Run Experiments
+Run End to End
+
+```bash
+# Train and evaluate every model in experiments/config_comparison.yaml
+python main.py
+
+# Add walk-forward evaluation (240-month train, 12-month test windows)
+python main.py --rolling --train-window 240 --test-window 12
+
+# Run a subset of models, or a different config
+python main.py --models global_linear lwlr mcllr
+python main.py --config experiments/config_mcllr.yaml --no-plots
+```
+
+Outputs go to `results/`: `metrics.csv`, `predictions.csv` (per-date predictions and
+uncertainties), `rolling_folds.csv` / `rolling_summary.csv` with `--rolling`, and
+diagnostic figures in `results/figures/`. Each run is also archived under
+`experiments/logs/` (disable with `--no-track`). See `python main.py --help`.
+
+Run Experiments (notebooks)
 
 # Launch notebook for exploratory data analysis
 jupyter notebook notebooks/01_dataset_exploration.ipynb

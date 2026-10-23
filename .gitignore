@@ -117,3 +117,6 @@ print_bundle/chrome_profile/
 
 # Experiment tracker output
 experiments/logs/
+
+# main.py outputs
+results/

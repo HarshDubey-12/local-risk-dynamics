@@ -21,12 +21,16 @@ class RollingExperimentRunner:
 
     def __init__(
         self,
-        config_path: str | Path,
+        config: str | Path | ExperimentConfig,
         train_window: int,
         test_window: int,
         step: int | None = None,
     ) -> None:
-        self.config = ExperimentConfig.from_yaml(config_path)
+        self.config = (
+            config
+            if isinstance(config, ExperimentConfig)
+            else ExperimentConfig.from_yaml(config)
+        )
         self.train_window = train_window
         self.test_window = test_window
         self.step = step

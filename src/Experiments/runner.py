@@ -20,6 +20,10 @@ class ExperimentRunner:
         )
         self.pipeline = DataPipeline()
         self.results = {}
+        # Populated by run(): full per-model outputs for plotting/export.
+        self.dataset = None
+        self.test_dates = None
+        self.eval_results = []
 
     def run(
         self,
@@ -41,9 +45,11 @@ class ExperimentRunner:
 
         # 2. Split data once 
         print("Splitting data...")
-        X_train, X_test, y_train, y_test, _, _ = time_series_split(
+        X_train, X_test, y_train, y_test, _, dates_test = time_series_split(
             dataset.X, dataset.y, dataset.dates, self.config.train_ratio
         )
+        self.dataset = dataset
+        self.test_dates = dates_test
         print(f" Train: {len(y_train)}, Test: {len(y_test)}")
 
         #3. Train and evaluate each model
@@ -70,6 +76,7 @@ class ExperimentRunner:
         ])
 
         self.results = results_df
+        self.eval_results = results
         return results_df
     
     def save_results(self, path: str | Path):
