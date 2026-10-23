@@ -2,5 +2,8 @@
 pandas
 numpy
 matplotlib
+pyyaml
+streamlit>=1.40
+altair>=5
 jupyter
 pytest

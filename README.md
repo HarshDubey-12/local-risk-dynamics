@@ -33,6 +33,22 @@ cd local-risk-dynamics
 # Install dependencies
 pip install -r requirements.txt
 
+Interactive App
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Opens at http://localhost:8501 with four pages: **Overview** (research question and
+pipeline), **Pipeline** (each step explained with live data), **Models** (how every
+model works, with an interactive kernel-locality explorer) and **Comparison** (choose
+models and hyperparameters, run hold-out or walk-forward evaluation, and compare
+metrics, forecasts, uncertainty bands and cumulative performance).
+
+To share it via a public link, deploy the repository on
+[Streamlit Community Cloud](https://share.streamlit.io) with `streamlit_app.py` as the
+main file.
+
 Run End to End
 
 ```bash

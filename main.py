@@ -104,17 +104,21 @@ def load_config(config_path: str, model_types: Optional[List[str]]) -> Experimen
     return replace(config, models=selected)
 
 
-def save_predictions(runner: ExperimentRunner, output_dir: Path) -> Path:
-    """Write per-date ground truth, predictions and uncertainties for every model."""
+def build_predictions_frame(runner: ExperimentRunner) -> pd.DataFrame:
+    """Per-date ground truth, predictions and uncertainties for every model."""
     frame = pd.DataFrame({"date": runner.test_dates})
     frame["y_true"] = runner.eval_results[0].ground_truth
     for result in runner.eval_results:
         frame[f"{result.model_name}_pred"] = result.predictions
         if result.uncertainties is not None:
             frame[f"{result.model_name}_std"] = result.uncertainties
+    return frame
 
+
+def save_predictions(runner: ExperimentRunner, output_dir: Path) -> Path:
+    """Write the predictions frame to ``output_dir/predictions.csv``."""
     path = output_dir / "predictions.csv"
-    frame.to_csv(path, index=False)
+    build_predictions_frame(runner).to_csv(path, index=False)
     return path
 
 
