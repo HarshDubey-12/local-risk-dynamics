@@ -15,7 +15,7 @@ Examples
     python main.py
     python main.py --models global_linear lwlr mcllr
     python main.py --rolling --train-window 240 --test-window 12
-    python main.py --config experiments/config_mcllr.yaml --no-plots
+    python main.py --config experiments/standard/config_mcllr.yaml --no-plots
 """
 
 from __future__ import annotations
@@ -34,11 +34,11 @@ matplotlib.use("Agg")  # Figures are written to disk; no display needed.
 
 import pandas as pd
 
-from src.config import ExperimentConfig
-from src.Experiments.rolling_runner import RollingExperimentRunner
-from src.Experiments.runner import ExperimentRunner
-from src.Experiments.tracking import ExperimentTracker
-from src.utils.plotting import (
+from lrd.standard.config import ExperimentConfig
+from lrd.standard.experiments.rolling_runner import RollingExperimentRunner
+from lrd.standard.experiments.runner import ExperimentRunner
+from lrd.core.tracking import ExperimentTracker
+from lrd.core.utils.plotting import (
     plot_model_comparison,
     plot_predictions_vs_true,
     plot_residuals,
@@ -47,7 +47,7 @@ from src.utils.plotting import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-DEFAULT_CONFIG = str(PROJECT_ROOT / "experiments" / "config_comparison.yaml")
+DEFAULT_CONFIG = str(PROJECT_ROOT / "experiments" / "standard" / "config_comparison.yaml")
 SUMMARY_COLUMNS = ["model", "rmse", "mae", "r2", "coverage_95", "interval_width_95"]
 
 
@@ -58,7 +58,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--config",
         default=DEFAULT_CONFIG,
-        help="Experiment YAML (default: experiments/config_comparison.yaml).",
+        help="Experiment YAML (default: experiments/standard/config_comparison.yaml).",
     )
     parser.add_argument(
         "--models",

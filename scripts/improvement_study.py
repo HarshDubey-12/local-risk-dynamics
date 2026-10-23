@@ -11,7 +11,6 @@ Run from the project root (takes ~2 minutes):
 
 from __future__ import annotations
 
-import math
 import sys
 import time
 import warnings
@@ -24,10 +23,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 warnings.filterwarnings("ignore")
 
-from src.data.loader import load_fama_french  # noqa: E402
-from src.models.lwlr import LocallyWeightedLinearRegression  # noqa: E402
-from src.models.mc_linear import MonteCarloLinearRegression  # noqa: E402
-from src.models.mcllr import MonteCarloLocalLinearRegression  # noqa: E402
+from lrd.core.data.loader import load_fama_french  # noqa: E402
+from lrd.core.evaluation.significance import diebold_mariano, oos_r2  # noqa: E402
+from lrd.standard.models.lwlr import LocallyWeightedLinearRegression  # noqa: E402
+from lrd.standard.models.mc_linear import MonteCarloLinearRegression  # noqa: E402
+from lrd.standard.models.mcllr import MonteCarloLocalLinearRegression  # noqa: E402
 
 TRAIN_WINDOW, TEST_WINDOW = 240, 12
 SPLIT_DATE = np.datetime64("2005-01-01")
@@ -113,17 +113,6 @@ MODELS = {
 }
 
 
-def diebold_mariano(e_model: np.ndarray, e_ref: np.ndarray) -> tuple[float, float]:
-    """DM test, squared loss, h=1. Negative t means the model beats the reference."""
-    d = e_model**2 - e_ref**2
-    t = d.mean() / (d.std(ddof=1) / np.sqrt(len(d)))
-    return float(t), math.erfc(abs(t) / math.sqrt(2))  # two-sided normal p-value
-
-
-def r2_vs(errors: np.ndarray, benchmark_errors: np.ndarray) -> float:
-    return 100 * (1 - np.sum(errors**2) / np.sum(benchmark_errors**2))
-
-
 def main() -> None:
     X, y, dates = load_fama_french(PROJECT_ROOT / "data/raw/F-F_Research_Data_5_Factors_2x3.csv")
     folds = [
@@ -154,10 +143,10 @@ def main() -> None:
     worst = np.argmax(np.abs(y_test - y_test.mean()))
     keep = np.arange(len(y_test)) != worst
 
-    res["r2_oos_%"] = [r2_vs(errors[m], hist) for m in res.model]
-    res["r2_pre2005_%"] = [r2_vs(errors[m][pre], hist[pre]) for m in res.model]
-    res["r2_post2005_%"] = [r2_vs(errors[m][~pre], hist[~pre]) for m in res.model]
-    res["r2_ex_worst_%"] = [r2_vs(errors[m][keep], hist[keep]) for m in res.model]
+    res["r2_oos_%"] = [100 * oos_r2(errors[m], hist) for m in res.model]
+    res["r2_pre2005_%"] = [100 * oos_r2(errors[m][pre], hist[pre]) for m in res.model]
+    res["r2_post2005_%"] = [100 * oos_r2(errors[m][~pre], hist[~pre]) for m in res.model]
+    res["r2_ex_worst_%"] = [100 * oos_r2(errors[m][keep], hist[keep]) for m in res.model]
     for ref, col in [("Ridge (alpha=1, repo)", "dm_vs_ridge"), ("Historical mean", "dm_vs_mean")]:
         tests = [diebold_mariano(errors[m], errors[ref]) for m in res.model]
         res[f"{col}_t"] = [t for t, _ in tests]

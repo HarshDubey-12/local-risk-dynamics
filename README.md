@@ -39,14 +39,14 @@ As implemented, the proposed MCLLR does not outperform the baselines: no model
 significantly beats the historical-mean forecast, and MCLLR is significantly worse than
 Ridge in walk-forward evaluation. Adding local ridge shrinkage and a predictive-variance
 term makes it the best model tested, with calibrated 95% intervals, though the edge is
-not yet statistically significant. See [MODEL_ASSESSMENT.md](MODEL_ASSESSMENT.md) for the
+not yet statistically significant. See [docs/MODEL_ASSESSMENT.md](docs/MODEL_ASSESSMENT.md) for the
 full results, the diagnosis and the proposed changes, reproducible with
 `python scripts/improvement_study.py`.
 
 Interactive App
 
 ```bash
-streamlit run streamlit_app.py
+streamlit run app/streamlit_app.py
 ```
 
 Opens at http://localhost:8501 with four pages: **Overview** (research question and
@@ -56,13 +56,13 @@ models and hyperparameters, run hold-out or walk-forward evaluation, and compare
 metrics, forecasts, uncertainty bands and cumulative performance).
 
 To share it via a public link, deploy the repository on
-[Streamlit Community Cloud](https://share.streamlit.io) with `streamlit_app.py` as the
+[Streamlit Community Cloud](https://share.streamlit.io) with `app/streamlit_app.py` as the
 main file.
 
 Run End to End
 
 ```bash
-# Train and evaluate every model in experiments/config_comparison.yaml
+# Train and evaluate every model in experiments/standard/config_comparison.yaml
 python main.py
 
 # Add walk-forward evaluation (240-month train, 12-month test windows)
@@ -70,7 +70,7 @@ python main.py --rolling --train-window 240 --test-window 12
 
 # Run a subset of models, or a different config
 python main.py --models global_linear lwlr mcllr
-python main.py --config experiments/config_mcllr.yaml --no-plots
+python main.py --config experiments/standard/config_mcllr.yaml --no-plots
 ```
 
 Outputs go to `results/`: `metrics.csv`, `predictions.csv` (per-date predictions and
@@ -232,7 +232,7 @@ y_pred = model.predict(X_test)
 
 2) Locally Weighted Linear Regression (LWLR) — Deterministic Locality
 ```python
-from src.models.lwlr import LocallyWeightedLinearRegression
+from lrd.standard.models.lwlr import LocallyWeightedLinearRegression
 
 lwlr = LocallyWeightedLinearRegression(bandwidth=1.0)
 lwlr.fit(X_train, y_train)
@@ -241,7 +241,7 @@ y_pred = lwlr.predict(X_test)
 
 3) Monte Carlo Subsampled Linear Regression — Stochastic Global Ensemble
 ```python
-from src.models.mc_linear import MonteCarloLinearRegression
+from lrd.standard.models.mc_linear import MonteCarloLinearRegression
 
 mc_model = MonteCarloLinearRegression(n_simulations=100, subsample_size=50)
 mc_model.fit(X_train, y_train)
@@ -250,7 +250,7 @@ y_mean, y_std = mc_model.predict(X_test, return_std=True)
 
 4) Monte Carlo Local Linear Regression (MCLLR) — Stochastic Locality (Proposed)
 ```python
-from src.models.mcllr import MonteCarloLocalLinearRegression
+from lrd.standard.models.mcllr import MonteCarloLocalLinearRegression
 
 mcllr = MonteCarloLocalLinearRegression(
     bandwidth=1.0,
@@ -259,7 +259,7 @@ mcllr = MonteCarloLocalLinearRegression(
 )
 
 mcllr.fit(X_train, y_train)
-y_pred, y_unc = mcllr.predict(X_test, return_uncertainty=True)
+y_pred, y_unc = mcllr.predict(X_test, return_std=True)
 ```
 
 Monte Carlo Local Linear Regression (MCLLR) — Design Architecture
@@ -395,7 +395,7 @@ Theory
 - Walk-forward folds test whether performance remains stable as regimes shift.
 
 Programming
-- Module: `src/evaluation/rolling.py`
+- Module: `lrd/core/evaluation/rolling.py`
 - Key APIs:
   - `walk_forward_splits(...)`
   - `evaluate_walk_forward(...)`
@@ -404,7 +404,7 @@ Programming
 
 Example
 ```python
-from src.evaluation.rolling import evaluate_walk_forward, rolling_results_to_frame
+from lrd.core.evaluation.rolling import evaluate_walk_forward, rolling_results_to_frame
 
 folds = evaluate_walk_forward(
     model_builder=lambda: model,
@@ -423,13 +423,13 @@ Theory
   not random splits, to avoid leakage and over-optimistic selection.
 
 Programming
-- Module: `src/Experiments/tuning.py`
+- Module: `lrd/standard/experiments/tuning.py`
 - API: `tune_model_with_walk_forward(...)`
 
 Example
 ```python
-from src.config import ModelCofig
-from src.Experiments.tuning import tune_model_with_walk_forward
+from lrd.standard.config import ModelCofig
+from lrd.standard.experiments.tuning import tune_model_with_walk_forward
 
 leaderboard, best = tune_model_with_walk_forward(
     base_model_config=ModelCofig(
@@ -462,8 +462,8 @@ Programming
 - Models added:
   - `mcllr_no_geometry` (stochastic sampling only)
   - `mcllr_no_stochasticity` (deterministic local subset only)
-- File: `src/models/mcllr_ablations.py`
-- Factory support: `src/models/factory.py`
+- File: `lrd/standard/models/mcllr_ablations.py`
+- Factory support: `lrd/standard/models/factory.py`
 
 Interpretation
 - If full `mcllr` consistently outperforms both ablations in rolling tests,
@@ -475,12 +475,12 @@ Theory
 - It must be calibrated and decision-useful.
 
 Programming
-- Added metrics in `src/evaluation/metrics.py`:
+- Added metrics in `lrd/core/evaluation/metrics.py`:
   - `coverage_95`
   - `interval_width_95`
   - `gaussian_nll`
   - `interval_score_95`
-- Integrated into `src/evaluation/evaluator.py` for all models that return uncertainty.
+- Integrated into `lrd/core/evaluation/evaluator.py` for all models that return uncertainty.
 
 5) Stronger regularized baseline
 Theory
@@ -489,20 +489,20 @@ Theory
 
 Programming
 - Model: `ridge_linear`
-- File: `src/models/ridge_linear.py`
-- Config support in `src/config.py` and `src/models/factory.py`
+- File: `lrd/standard/models/ridge_linear.py`
+- Config support in `lrd/standard/config.py` and `lrd/standard/models/factory.py`
 
 6) End-to-end rolling experiment runner
 Programming
-- Module: `src/Experiments/rolling_runner.py`
+- Module: `lrd/standard/experiments/rolling_runner.py`
 - Runs all models from one config over walk-forward folds.
 
 Example
 ```python
-from src.Experiments.rolling_runner import RollingExperimentRunner
+from lrd.standard.experiments.rolling_runner import RollingExperimentRunner
 
 runner = RollingExperimentRunner(
-    "experiments/config_comparison.yaml",
+    "experiments/standard/config_comparison.yaml",
     train_window=240,
     test_window=24,
     step=24,
@@ -512,7 +512,7 @@ fold_df, summary_df = runner.run()
 
 7) Unified experiment config for claim testing
 Programming
-- File: `experiments/config_comparison.yaml`
+- File: `experiments/standard/config_comparison.yaml`
 - Includes:
   - `global_linear`
   - `ridge_linear`
@@ -532,52 +532,44 @@ Practical criterion for claim acceptance
 Project Structure
 ```
 local-risk-dynamics/
-  data/
-    raw/                    # Original Fama-French data
-    processed/              # Preprocessed datasets
-  notebooks/
-    01_dataset_exploration.ipynb
-    02_global_linear_baseline.ipynb
-    03_lwlr_deterministic.ipynb
-    04_mc_subsampled_linear.ipynb
-    05_mcllr_proposed.ipynb
-    06_results_comparison.ipynb
-  src/
-    data/
-      loader.py
-      preprocessing.py
-    models/
-      global_linear.py
-      lwlr.py
-      mc_linear.py
-      mcllr.py
-    evaluation/
-      metrics.py
-      backtesting.py
-    utils/
-      kernels.py
-      sampling.py
-      plotting.py
-  experiments/
-    config_global.yaml
-    config_lwlr.yaml
-    config_mc.yaml
-    config_mcllr.yaml
-  figures/
-  README.md
+  README.md                  # overview (this file)
+  docs/
+    PIPELINE.md              # how the standard and improved pipelines work
+    MODEL_ASSESSMENT.md      # results, diagnosis and improvement roadmap
+  data/raw/                  # Fama-French data (shared by both systems)
+  lrd/                       # Python package
+    core/                    # SHARED: data loading/splitting, model interface,
+                             #   metrics, evaluator, walk-forward folds,
+                             #   significance tests, experiment tracking
+    standard/                # original system: config, 7 models, runners
+    improved/                # improved pipeline (in development)
+  experiments/standard/      # YAML configs for the standard system
+  main.py                    # end-to-end CLI
+  app/streamlit_app.py       # interactive explainer + model comparison
+  scripts/                   # improvement_study.py and utilities
+  notebooks/                 # exploratory notebooks
+  tests/                     # core/, standard/, CLI and app tests
+  pyproject.toml             # package + pytest configuration
   requirements.txt
 ```
 
+The original system is preserved exactly at the git tag `v1-standard`
+(`git checkout v1-standard`). Both systems share `lrd/core`, so they are always compared
+on the same months with the same metric definitions.
+
 Repository Philosophy
-Separates theory (README), engineering (src/), and evidence (notebooks/figures), mirroring quantitative research repositories and ML paper implementations.
+Separates theory (README, docs/), engineering (lrd/), and evidence (notebooks, scripts,
+the app), mirroring quantitative research repositories and ML paper implementations.
 
 Project Status
-Current stage: complete theoretical foundation + structured research scaffold.
+- Standard system: implemented, tested and evaluated (see docs/MODEL_ASSESSMENT.md).
+- Improved system: pipeline designed (docs/PIPELINE.md); implementation in `lrd/improved/`
+  is the next milestone.
 
-Next milestones:
-- Full MCLLR implementation
-- Empirical comparison
-- Industry implications
+Running tests
+```bash
+python -m pytest
+```
 
 Contributing
 ```bash
