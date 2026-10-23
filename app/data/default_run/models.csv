@@ -1,0 +1,11 @@
+key,system,model_type,protocol,params
+standard:global_linear,standard,global_linear,walk_forward,"{""fit_intercept"": true, ""random_state"": 42}"
+standard:ridge_linear,standard,ridge_linear,walk_forward,"{""fit_intercept"": true, ""random_state"": 42, ""alpha"": 1.0}"
+standard:lwlr,standard,lwlr,walk_forward,"{""fit_intercept"": true, ""random_state"": 42, ""bandwidth"": 0.08}"
+standard:mc_linear,standard,mc_linear,walk_forward,"{""fit_intercept"": true, ""random_state"": 42, ""n_simulations"": 50, ""subsample_size"": 80}"
+standard:mcllr,standard,mcllr,walk_forward,"{""fit_intercept"": true, ""random_state"": 42, ""bandwidth"": 0.08, ""n_simulations"": 50, ""subsample_size"": 80}"
+standard:mcllr_no_geometry,standard,mcllr_no_geometry,walk_forward,"{""fit_intercept"": true, ""random_state"": 42, ""n_simulations"": 50, ""subsample_size"": 80}"
+standard:mcllr_no_stochasticity,standard,mcllr_no_stochasticity,walk_forward,"{""fit_intercept"": true, ""random_state"": 42, ""bandwidth"": 0.08, ""subsample_size"": 80}"
+improved:historical_mean,improved,historical_mean,walk_forward,{}
+improved:ridge,improved,ridge,walk_forward,"{""preprocessing"": [""standardize""], ""grid"": {""alpha"": [0.1, 1.0, 3.0, 10.0, 30.0]}}"
+improved:mcllr_improved,improved,mcllr_improved,walk_forward,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""preprocessing"": [""standardize""], ""grid"": {""bandwidth"": [1.0, 2.0, 3.0], ""alpha"": [1.0, 3.0, 10.0, 30.0]}}"

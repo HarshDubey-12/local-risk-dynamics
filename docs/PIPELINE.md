@@ -56,7 +56,7 @@ YAML config (experiments/standard/) → ExperimentConfig (validated)
 | Walk-forward runner | `lrd/standard/experiments/rolling_runner.py` |
 | Grid sweep / walk-forward tuning | `lrd/standard/experiments/sweep.py`, `tuning.py` |
 | CLI | `main.py` |
-| App | `app/streamlit_app.py` |
+| Dashboard | `app/dashboard.py` (see [APP.md](APP.md)) |
 
 Characteristics: one preparation for all models (raw decimal returns), hyperparameters
 fixed in the config, MCLLR uncertainty is epistemic only. Results and limitations are in

@@ -1,0 +1,8 @@
+{
+  "created": "2026-10-23T18:58:18+00:00",
+  "data_hash": "3bd08ad9",
+  "train_window": 240,
+  "test_window": 12,
+  "standard_config": "experiments/standard/config_comparison.yaml",
+  "improved_config": "experiments/improved/config_improved.yaml"
+}

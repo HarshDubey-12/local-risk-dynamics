@@ -1,0 +1,85 @@
+fold_id,test_start_date,chosen,inner_mse,key
+0,1983-07-01,"{""alpha"": 1.0}",0.0024286353059556304,improved:ridge
+1,1984-07-01,"{""alpha"": 1.0}",0.0021753052919939444,improved:ridge
+2,1985-07-01,"{""alpha"": 1.0}",0.0018273164400492922,improved:ridge
+3,1986-07-01,"{""alpha"": 1.0}",0.0018971079481644381,improved:ridge
+4,1987-07-01,"{""alpha"": 0.1}",0.002030364704783561,improved:ridge
+5,1988-07-01,"{""alpha"": 0.1}",0.0026302354698176118,improved:ridge
+6,1989-07-01,"{""alpha"": 0.1}",0.002699626702763738,improved:ridge
+7,1990-07-01,"{""alpha"": 0.1}",0.002639615840370556,improved:ridge
+8,1991-07-01,"{""alpha"": 0.1}",0.0026866761437640673,improved:ridge
+9,1992-07-01,"{""alpha"": 0.1}",0.0024482012068162327,improved:ridge
+10,1993-07-01,"{""alpha"": 0.1}",0.001332618053336054,improved:ridge
+11,1994-07-01,"{""alpha"": 0.1}",0.0012311428180662991,improved:ridge
+12,1995-07-01,"{""alpha"": 0.1}",0.0010688556511140282,improved:ridge
+13,1996-07-01,"{""alpha"": 30.0}",0.0007492495176983301,improved:ridge
+14,1997-07-01,"{""alpha"": 30.0}",0.000826026709249587,improved:ridge
+15,1998-07-01,"{""alpha"": 30.0}",0.0010110319424488866,improved:ridge
+16,1999-07-01,"{""alpha"": 30.0}",0.0017154019933901105,improved:ridge
+17,2000-07-01,"{""alpha"": 30.0}",0.002017165695901228,improved:ridge
+18,2001-07-01,"{""alpha"": 30.0}",0.0027005149581335263,improved:ridge
+19,2002-07-01,"{""alpha"": 30.0}",0.003022418995740044,improved:ridge
+20,2003-07-01,"{""alpha"": 10.0}",0.0033434597379839153,improved:ridge
+21,2004-07-01,"{""alpha"": 3.0}",0.0026403458195289127,improved:ridge
+22,2005-07-01,"{""alpha"": 3.0}",0.0023309996560546527,improved:ridge
+23,2006-07-01,"{""alpha"": 0.1}",0.001585637019173508,improved:ridge
+24,2007-07-01,"{""alpha"": 3.0}",0.0010281570269823435,improved:ridge
+25,2008-07-01,"{""alpha"": 10.0}",0.000792396227986478,improved:ridge
+26,2009-07-01,"{""alpha"": 1.0}",0.0021383129384149407,improved:ridge
+27,2010-07-01,"{""alpha"": 1.0}",0.0024614572262816,improved:ridge
+28,2011-07-01,"{""alpha"": 1.0}",0.002709265220274633,improved:ridge
+29,2012-07-01,"{""alpha"": 1.0}",0.003148728708532179,improved:ridge
+30,2013-07-01,"{""alpha"": 1.0}",0.002962026873049393,improved:ridge
+31,2014-07-01,"{""alpha"": 0.1}",0.0016040803945254133,improved:ridge
+32,2015-07-01,"{""alpha"": 0.1}",0.0013259556997854047,improved:ridge
+33,2016-07-01,"{""alpha"": 30.0}",0.0013556084517980403,improved:ridge
+34,2017-07-01,"{""alpha"": 30.0}",0.0008801935647879961,improved:ridge
+35,2018-07-01,"{""alpha"": 30.0}",0.000840043958937106,improved:ridge
+36,2019-07-01,"{""alpha"": 30.0}",0.0012803430539491745,improved:ridge
+37,2020-07-01,"{""alpha"": 30.0}",0.0020107570540802383,improved:ridge
+38,2021-07-01,"{""alpha"": 30.0}",0.002093002987334976,improved:ridge
+39,2022-07-01,"{""alpha"": 30.0}",0.0027176727735035724,improved:ridge
+40,2023-07-01,"{""alpha"": 30.0}",0.0031395151784001235,improved:ridge
+41,2024-07-01,"{""alpha"": 30.0}",0.0028922172736526894,improved:ridge
+0,1983-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 1.0}",0.0024167995387183922,improved:mcllr_improved
+1,1984-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 1.0}",0.0021667468993583783,improved:mcllr_improved
+2,1985-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 1.0}",0.0018174806411318468,improved:mcllr_improved
+3,1986-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 1.0}",0.0018841521989200105,improved:mcllr_improved
+4,1987-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 1.0}",0.002032121275241397,improved:mcllr_improved
+5,1988-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 1.0}",0.002638202857083607,improved:mcllr_improved
+6,1989-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 1.0}",0.0027131720124221053,improved:mcllr_improved
+7,1990-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 1.0}",0.0026751993624452067,improved:mcllr_improved
+8,1991-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 1.0}",0.0027837194095397524,improved:mcllr_improved
+9,1992-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 1.0}",0.002500406064972088,improved:mcllr_improved
+10,1993-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 2.0, ""alpha"": 1.0}",0.001361144411221558,improved:mcllr_improved
+11,1994-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 1.0}",0.001267155946840239,improved:mcllr_improved
+12,1995-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 2.0, ""alpha"": 1.0}",0.00109952216203038,improved:mcllr_improved
+13,1996-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 30.0}",0.0007485572354611745,improved:mcllr_improved
+14,1997-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 30.0}",0.0008250359357585393,improved:mcllr_improved
+15,1998-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 30.0}",0.001011064979824685,improved:mcllr_improved
+16,1999-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 30.0}",0.001717046267952473,improved:mcllr_improved
+17,2000-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 30.0}",0.0020159318739135217,improved:mcllr_improved
+18,2001-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 30.0}",0.0026976278429529845,improved:mcllr_improved
+19,2002-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 10.0}",0.003031993266736325,improved:mcllr_improved
+20,2003-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 10.0}",0.0033509324468965775,improved:mcllr_improved
+21,2004-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 1.0}",0.0026318431727313744,improved:mcllr_improved
+22,2005-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 1.0}",0.0023008684071671687,improved:mcllr_improved
+23,2006-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 1.0}",0.0015948537097855312,improved:mcllr_improved
+24,2007-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 10.0}",0.0010269527821103993,improved:mcllr_improved
+25,2008-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 3.0}",0.000795505441965615,improved:mcllr_improved
+26,2009-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 1.0}",0.0021313032691699595,improved:mcllr_improved
+27,2010-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 1.0}",0.00245314765157506,improved:mcllr_improved
+28,2011-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 1.0}",0.002696774387764787,improved:mcllr_improved
+29,2012-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 1.0}",0.003140499018717919,improved:mcllr_improved
+30,2013-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 1.0}",0.002941052688348982,improved:mcllr_improved
+31,2014-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 1.0}",0.0016129458762399994,improved:mcllr_improved
+32,2015-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 30.0}",0.0013082211331947402,improved:mcllr_improved
+33,2016-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 30.0}",0.0013408142936437784,improved:mcllr_improved
+34,2017-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 1.0, ""alpha"": 30.0}",0.00085983599834375,improved:mcllr_improved
+35,2018-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 2.0, ""alpha"": 30.0}",0.0008352675421622509,improved:mcllr_improved
+36,2019-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 30.0}",0.001281743020028384,improved:mcllr_improved
+37,2020-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 30.0}",0.0020132590828043956,improved:mcllr_improved
+38,2021-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 2.0, ""alpha"": 30.0}",0.002095053699894283,improved:mcllr_improved
+39,2022-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 30.0}",0.0027234945403250828,improved:mcllr_improved
+40,2023-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 30.0}",0.0031460852475820498,improved:mcllr_improved
+41,2024-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 30.0}",0.0028952199761872804,improved:mcllr_improved

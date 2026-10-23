@@ -48,20 +48,22 @@ and the remaining roadmap.
 Data validation also found and removed a duplicated block of 68 months in the raw CSV;
 all results use the corrected data (the original state is preserved in tag `v1-standard`).
 
-Interactive App
+Dashboard
 
 ```bash
-streamlit run app/streamlit_app.py
+streamlit run app/dashboard.py
 ```
 
-Opens at http://localhost:8501 with four pages: **Overview** (research question and
-pipeline), **Pipeline** (each step explained with live data), **Models** (how every
-model works, with an interactive kernel-locality explorer) and **Comparison** (choose
-models and hyperparameters, run hold-out or walk-forward evaluation, and compare
-metrics, forecasts, uncertainty bands and cumulative performance).
+Opens at http://localhost:8501 with four interactive screens covering both systems:
+**Project overview** (objective, methodology, every model, practices), **Data analysis**
+(validation checks and pre-analysis), **Models** (each model switchable, with live
+settings, results and a locality explorer) and **Comparison** (any models from either
+system on the shared walk-forward folds). See [docs/APP.md](docs/APP.md).
 
-To share it via a public link, deploy the repository on
-[Streamlit Community Cloud](https://share.streamlit.io) with `app/streamlit_app.py` as the
+Default results are precomputed in `app/data/default_run/`; rebuild them with
+`python scripts/build_app_results.py` after changing the data or default configs. To
+share the dashboard via a public link, deploy the repository on
+[Streamlit Community Cloud](https://share.streamlit.io) with `app/dashboard.py` as the
 main file.
 
 Run End to End
@@ -547,6 +549,7 @@ local-risk-dynamics/
   docs/
     PIPELINE.md              # how the standard and improved pipelines work
     MODEL_ASSESSMENT.md      # results, diagnosis and improvement roadmap
+    APP.md                   # dashboard screens and design decisions
   data/raw/                  # Fama-French data (shared by both systems)
   lrd/                       # Python package
     core/                    # SHARED: data loading/splitting, model interface,
@@ -557,7 +560,8 @@ local-risk-dynamics/
   experiments/standard/      # YAML configs for the standard system
   experiments/improved/      # YAML config for the improved system
   main.py                    # end-to-end CLI
-  app/streamlit_app.py       # interactive explainer + model comparison
+  app/dashboard.py           # interactive dashboard (screens in app/views/)
+  lrd/comparison.py          # runs both systems on shared folds for comparison
   scripts/                   # improvement_study.py and utilities
   notebooks/                 # exploratory notebooks
   tests/                     # core/, standard/, improved/, CLI and app tests
