@@ -33,6 +33,16 @@ cd local-risk-dynamics
 # Install dependencies
 pip install -r requirements.txt
 
+Results and Model Assessment
+
+As implemented, the proposed MCLLR does not outperform the baselines: no model
+significantly beats the historical-mean forecast, and MCLLR is significantly worse than
+Ridge in walk-forward evaluation. Adding local ridge shrinkage and a predictive-variance
+term makes it the best model tested, with calibrated 95% intervals, though the edge is
+not yet statistically significant. See [MODEL_ASSESSMENT.md](MODEL_ASSESSMENT.md) for the
+full results, the diagnosis and the proposed changes, reproducible with
+`python scripts/improvement_study.py`.
+
 Interactive App
 
 ```bash
