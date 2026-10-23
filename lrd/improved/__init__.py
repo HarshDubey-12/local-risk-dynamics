@@ -1,13 +1,13 @@
-"""The improved modelling pipeline (in development).
+"""The improved modelling system (see docs/PIPELINE.md).
 
-Planned design (see docs/PIPELINE.md and docs/MODEL_ASSESSMENT.md):
+1. Raw data is validated once (``lrd.core.data.validation``).
+2. Every model is evaluated on the same walk-forward folds (``lrd.core``).
+3. Inside each fold, on training data only: model-specific preparation
+   (``preprocessing.PreparedModel``) and nested hyperparameter tuning
+   (``tuning.TunedModel``), then fit and predict.
+4. Shared metrics, calibration and significance tests against a benchmark
+   (``pipeline.ImprovedPipeline``).
 
-1. Data validation and analysis report, run once (in ``lrd.core``).
-2. One shared chronological split / set of walk-forward folds (``lrd.core``).
-3. Per model, fitted on training data only: model-specific preparation
-   (e.g. standardised factors), hyperparameter tuning, fit and predict.
-4. Shared evaluation and significance tests (``lrd.core.evaluation``).
-
-First model: MCLLR with local ridge shrinkage, standardised kernel distances
-and predictive variance (validated in scripts/improvement_study.py).
+Models: ``HistoricalMean`` (benchmark), ``RidgeRegression`` and
+``ImprovedMCLLR`` (local ridge, standardised distances, predictive variance).
 """

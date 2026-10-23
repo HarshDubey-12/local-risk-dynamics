@@ -2,7 +2,7 @@
 """
 End-to-end entry point for Local Risk Dynamics.
 
-Runs the full pipeline from an experiment config:
+Standard system (``--system standard``, the default):
 
     1. Load and validate the experiment config (optionally a subset of models).
     2. Load the Fama-French dataset and make a chronological train/test split.
@@ -10,12 +10,22 @@ Runs the full pipeline from an experiment config:
     4. Optionally run walk-forward (rolling) evaluation.
     5. Save metrics, predictions and figures, and log the run.
 
+Improved system (``--system improved``; outputs in <output-dir>/improved):
+
+    1. Validate the raw data (missing/garbage/duplicate months, outliers flagged).
+    2. Walk-forward folds shared by every model.
+    3. Per model and fold: preparation and nested tuning on the training window,
+       then fit and predict.
+    4. Metrics, calibration and Diebold-Mariano tests against the benchmark.
+
 Examples
 --------
     python main.py
     python main.py --models global_linear lwlr mcllr
     python main.py --rolling --train-window 240 --test-window 12
     python main.py --config experiments/standard/config_mcllr.yaml --no-plots
+    python main.py --system improved
+    python main.py --system both --rolling
 """
 
 from __future__ import annotations
@@ -37,6 +47,8 @@ import pandas as pd
 from lrd.standard.config import ExperimentConfig
 from lrd.standard.experiments.rolling_runner import RollingExperimentRunner
 from lrd.standard.experiments.runner import ExperimentRunner
+from lrd.improved.config import ImprovedExperimentConfig
+from lrd.improved.pipeline import ImprovedPipeline
 from lrd.core.tracking import ExperimentTracker
 from lrd.core.utils.plotting import (
     plot_model_comparison,
@@ -48,7 +60,10 @@ from lrd.core.utils.plotting import (
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_CONFIG = str(PROJECT_ROOT / "experiments" / "standard" / "config_comparison.yaml")
+DEFAULT_IMPROVED_CONFIG = str(PROJECT_ROOT / "experiments" / "improved" / "config_improved.yaml")
 SUMMARY_COLUMNS = ["model", "rmse", "mae", "r2", "coverage_95", "interval_width_95"]
+IMPROVED_COLUMNS = ["model", "rmse", "mae", "oos_r2_%", "coverage_95", "interval_score_95",
+                    "dm_p_vs_historical_mean"]
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -56,18 +71,32 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         description="Train and evaluate Local Risk Dynamics models end to end."
     )
     parser.add_argument(
+        "--system",
+        choices=["standard", "improved", "both"],
+        default="standard",
+        help="Which modelling system to run (default: standard).",
+    )
+    parser.add_argument(
         "--config",
         default=DEFAULT_CONFIG,
-        help="Experiment YAML (default: experiments/standard/config_comparison.yaml).",
+        help="Standard experiment YAML (default: experiments/standard/config_comparison.yaml).",
+    )
+    parser.add_argument(
+        "--improved-config",
+        default=DEFAULT_IMPROVED_CONFIG,
+        help="Improved experiment YAML (default: experiments/improved/config_improved.yaml).",
     )
     parser.add_argument(
         "--models",
         nargs="+",
-        metavar="MODEL_TYPE",
-        help="Only run these model types from the config (default: all).",
+        metavar="MODEL",
+        help="Only run these models: model types for standard, model names for improved "
+        "(the improved benchmark is always kept). Default: all.",
     )
     parser.add_argument(
-        "--output-dir", default="results", help="Directory for CSVs and figures (default: results)."
+        "--output-dir",
+        default="results",
+        help="Directory for outputs (default: results). Improved outputs go to <output-dir>/improved.",
     )
     parser.add_argument(
         "--rolling", action="store_true", help="Also run walk-forward evaluation."
@@ -174,61 +203,120 @@ def print_table(frame: pd.DataFrame, columns: List[str]) -> None:
     print(frame[present].to_string(index=False, float_format=lambda v: f"{v:.4f}"))
 
 
+def run_standard(args: argparse.Namespace, output_dir: Path) -> List[tuple[str, pd.DataFrame, List[str]]]:
+    """Standard system: hold-out (+ optional walk-forward). Returns tables to print."""
+    print(f"[standard 1/4] Loading config {args.config}")
+    config = load_config(args.config, args.models)
+    print(f"  Models: {', '.join(m.model_type for m in config.models)}")
+
+    print("[standard 2/4] Train/test evaluation")
+    runner = ExperimentRunner(config)
+    results = runner.run()
+    results.to_csv(output_dir / "metrics.csv", index=False)
+    save_predictions(runner, output_dir)
+
+    tables = [("Standard: hold-out results", results.sort_values("rmse"), SUMMARY_COLUMNS)]
+    if args.rolling:
+        print(
+            f"[standard 3/4] Walk-forward evaluation "
+            f"(train={args.train_window}, test={args.test_window}, step={args.step or args.test_window})"
+        )
+        rolling_table = run_rolling(config, args, output_dir)
+        tables.append((
+            "Standard: walk-forward results (mean over folds)",
+            rolling_table.reset_index().sort_values("rmse"),
+            SUMMARY_COLUMNS,
+        ))
+    else:
+        print("[standard 3/4] Walk-forward evaluation skipped (use --rolling)")
+
+    print("[standard 4/4] Saving outputs")
+    if not args.no_plots:
+        n_figures = save_figures(runner, output_dir / "figures")
+        print(f"  {n_figures} figures -> {output_dir / 'figures'}")
+    if not args.no_track:
+        log_dir = ExperimentTracker().log_experiment(
+            args.config,
+            results,
+            metadata={
+                "system": "standard",
+                "dataset_hash": runner.dataset.source_hash,
+                "models": [m.model_type for m in config.models],
+                "rolling": args.rolling,
+            },
+        )
+        print(f"  Run logged -> {log_dir}")
+    return tables
+
+
+def load_improved_config(config_path: str, names: Optional[List[str]]) -> ImprovedExperimentConfig:
+    """Load the improved config, keeping the requested model names plus the benchmark."""
+    config = ImprovedExperimentConfig.from_yaml(config_path)
+    if not names:
+        return config
+    available = [m.name for m in config.models]
+    unknown = sorted(set(names) - set(available))
+    if unknown:
+        raise ValueError(f"Models {unknown} are not in {config_path}. Available: {available}")
+    keep = set(names) | {config.benchmark}
+    return replace(config, models=[m for m in config.models if m.name in keep])
+
+
+def run_improved(args: argparse.Namespace, output_dir: Path) -> List[tuple[str, pd.DataFrame, List[str]]]:
+    """Improved system: validated data, per-model preparation and nested tuning, walk-forward."""
+    print(f"[improved 1/3] Loading config {args.improved_config}")
+    config = load_improved_config(args.improved_config, args.models)
+    print(f"  Models: {', '.join(m.name for m in config.models)} (benchmark: {config.benchmark})")
+
+    print(f"[improved 2/3] Walk-forward evaluation (train={config.train_window}, test={config.test_window}; "
+          f"nested tuning inner train={config.inner_train_window})")
+    results = ImprovedPipeline(config).run()
+
+    print("[improved 3/3] Saving outputs")
+    results.save(output_dir)
+    print(f"  summary, folds, predictions, tuning, validation report -> {output_dir}")
+    if not args.no_track:
+        log_dir = ExperimentTracker().log_experiment(
+            args.improved_config,
+            results.summary,
+            metadata={
+                "system": "improved",
+                "dataset_hash": results.validation.source_hash,
+                "models": [m.name for m in config.models],
+            },
+        )
+        print(f"  Run logged -> {log_dir}")
+    return [(
+        f"Improved: walk-forward results (all test months; OOS R2 vs {config.benchmark})",
+        results.summary.sort_values("rmse"),
+        IMPROVED_COLUMNS,
+    )]
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
     # Resolve user paths against the caller's directory, then work from the
     # project root, where the configs' dataset paths are relative to.
     args.config = str(Path(args.config).resolve())
+    args.improved_config = str(Path(args.improved_config).resolve())
     output_dir = Path(args.output_dir).resolve()
     os.chdir(PROJECT_ROOT)
     output_dir.mkdir(parents=True, exist_ok=True)
     start = time.perf_counter()
 
+    tables = []
     try:
-        print(f"[1/4] Loading config {args.config}")
-        config = load_config(args.config, args.models)
-        print(f"  Models: {', '.join(m.model_type for m in config.models)}")
-
-        print("[2/4] Train/test evaluation")
-        runner = ExperimentRunner(config)
-        results = runner.run()
-        results.to_csv(output_dir / "metrics.csv", index=False)
-        save_predictions(runner, output_dir)
-
-        rolling_table = None
-        if args.rolling:
-            print(
-                f"[3/4] Walk-forward evaluation "
-                f"(train={args.train_window}, test={args.test_window}, step={args.step or args.test_window})"
-            )
-            rolling_table = run_rolling(config, args, output_dir)
-        else:
-            print("[3/4] Walk-forward evaluation skipped (use --rolling)")
-
-        print("[4/4] Saving outputs")
-        if not args.no_plots:
-            n_figures = save_figures(runner, output_dir / "figures")
-            print(f"  {n_figures} figures -> {output_dir / 'figures'}")
-        if not args.no_track:
-            log_dir = ExperimentTracker().log_experiment(
-                args.config,
-                results,
-                metadata={
-                    "dataset_hash": runner.dataset.source_hash,
-                    "models": [m.model_type for m in config.models],
-                    "rolling": args.rolling,
-                },
-            )
-            print(f"  Run logged -> {log_dir}")
+        if args.system in ("standard", "both"):
+            tables += run_standard(args, output_dir)
+        if args.system in ("improved", "both"):
+            tables += run_improved(args, output_dir / "improved")
     except (FileNotFoundError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
-    print("\n=== Hold-out results ===")
-    print_table(results.sort_values("rmse"), SUMMARY_COLUMNS)
-    if rolling_table is not None:
-        print("\n=== Walk-forward results (mean over folds) ===")
-        print_table(rolling_table.reset_index().sort_values("rmse"), SUMMARY_COLUMNS)
+    for title, frame, columns in tables:
+        print(f"\n=== {title} ===")
+        print_table(frame, columns)
 
     print(f"\nDone in {time.perf_counter() - start:.1f}s. Outputs in {output_dir.resolve()}")
     return 0

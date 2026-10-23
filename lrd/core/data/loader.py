@@ -69,6 +69,14 @@ def load_fama_french(
      # Parse dates (YYYYMM format)
      df["Date"] = pd.to_datetime(df["Date"].astype(str), format="%Y%m")
 
+     # A duplicated or out-of-order month would silently corrupt the t -> t+1
+     # target alignment, so refuse to load such a file.
+     if df["Date"].duplicated().any() or not df["Date"].is_monotonic_increasing:
+          raise ValueError(
+               f"{csv_path} has duplicated or out-of-order months; "
+               "run lrd.core.data.validation.validate_fama_french for details."
+          )
+
      # Convert percentage returns -> decimals (ensure numeric type first)
      df[ALL_RETURN_COLUMNS] = df[ALL_RETURN_COLUMNS].apply(pd.to_numeric, errors='coerce') / 100.0
 

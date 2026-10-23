@@ -653,7 +653,7 @@ def page_comparison() -> None:
     if not models:
         st.warning("Select at least one model.")
         return
-    min_train = train_window if mode == "Walk-forward" else int(816 * train_ratio)
+    min_train = train_window if mode == "Walk-forward" else int(len(load_data()[1]) * train_ratio)
     if subsample > min_train:
         st.error(f"Subsample size m = {subsample} exceeds the {min_train} training months.")
         return

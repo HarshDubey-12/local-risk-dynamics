@@ -35,13 +35,18 @@ pip install -r requirements.txt
 
 Results and Model Assessment
 
-As implemented, the proposed MCLLR does not outperform the baselines: no model
+As originally specified, the proposed MCLLR does not outperform the baselines: no model
 significantly beats the historical-mean forecast, and MCLLR is significantly worse than
-Ridge in walk-forward evaluation. Adding local ridge shrinkage and a predictive-variance
-term makes it the best model tested, with calibrated 95% intervals, though the edge is
-not yet statistically significant. See [docs/MODEL_ASSESSMENT.md](docs/MODEL_ASSESSMENT.md) for the
-full results, the diagnosis and the proposed changes, reproducible with
-`python scripts/improvement_study.py`.
+Ridge in walk-forward evaluation. The improved system (`lrd/improved`) adds data
+validation, train-only standardisation, local ridge shrinkage, predictive variance and
+nested walk-forward tuning; its MCLLR is the best model tested (+0.36% out-of-sample R²
+against the historical mean, best interval score, 94% coverage of 95% intervals), though
+the edge is not statistically significant. See
+[docs/MODEL_ASSESSMENT.md](docs/MODEL_ASSESSMENT.md) for the full results, the diagnosis
+and the remaining roadmap.
+
+Data validation also found and removed a duplicated block of 68 months in the raw CSV;
+all results use the corrected data (the original state is preserved in tag `v1-standard`).
 
 Interactive App
 
@@ -71,11 +76,17 @@ python main.py --rolling --train-window 240 --test-window 12
 # Run a subset of models, or a different config
 python main.py --models global_linear lwlr mcllr
 python main.py --config experiments/standard/config_mcllr.yaml --no-plots
+
+# Improved system (outputs in results/improved/), or both systems in one run
+python main.py --system improved
+python main.py --system both --rolling
 ```
 
 Outputs go to `results/`: `metrics.csv`, `predictions.csv` (per-date predictions and
 uncertainties), `rolling_folds.csv` / `rolling_summary.csv` with `--rolling`, and
-diagnostic figures in `results/figures/`. Each run is also archived under
+diagnostic figures in `results/figures/`. The improved system writes `summary.csv`,
+`folds.csv`, `predictions.csv`, `tuning.csv` (hyperparameters chosen per fold) and
+`validation_report.md` to `results/improved/`. Each run is also archived under
 `experiments/logs/` (disable with `--no-track`). See `python main.py --help`.
 
 Run Experiments (notebooks)
@@ -542,13 +553,14 @@ local-risk-dynamics/
                              #   metrics, evaluator, walk-forward folds,
                              #   significance tests, experiment tracking
     standard/                # original system: config, 7 models, runners
-    improved/                # improved pipeline (in development)
+    improved/                # improved system: validation, train-only prep, nested tuning
   experiments/standard/      # YAML configs for the standard system
+  experiments/improved/      # YAML config for the improved system
   main.py                    # end-to-end CLI
   app/streamlit_app.py       # interactive explainer + model comparison
   scripts/                   # improvement_study.py and utilities
   notebooks/                 # exploratory notebooks
-  tests/                     # core/, standard/, CLI and app tests
+  tests/                     # core/, standard/, improved/, CLI and app tests
   pyproject.toml             # package + pytest configuration
   requirements.txt
 ```
@@ -563,8 +575,8 @@ the app), mirroring quantitative research repositories and ML paper implementati
 
 Project Status
 - Standard system: implemented, tested and evaluated (see docs/MODEL_ASSESSMENT.md).
-- Improved system: pipeline designed (docs/PIPELINE.md); implementation in `lrd/improved/`
-  is the next milestone.
+- Improved system: implemented in `lrd/improved/` (`python main.py --system improved`);
+  results in docs/MODEL_ASSESSMENT.md §5, next steps in §6.
 
 Running tests
 ```bash

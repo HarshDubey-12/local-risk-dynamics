@@ -10,7 +10,7 @@ describes how each pipeline runs and where its code lives.
         │ folds → model interface → metrics + significance tests → tracking │
         └──────────────────────────────────────────────────────────────────┘
                  ▲                                         ▲
-     lrd/standard (original system)          lrd/improved (in development)
+     lrd/standard (original system)          lrd/improved (improved system)
 ```
 
 **Why a shared core?** A comparison between systems is only fair if both are tested
@@ -23,7 +23,8 @@ evaluation therefore exist once, in `lrd/core`, and both systems call it.
 
 | Step | Module | What it does |
 |---|---|---|
-| Load | `data/loader.py` | Reads the Fama–French CSV, keeps monthly `YYYYMM` rows, converts % to decimals, builds X (factors at *t*) and y (Mkt-RF at *t+1*), drops the last month |
+| Validate | `data/validation.py` | Checks the raw file for missing/garbage values, duplicate or missing months and ordering; flags extreme values (never removes them); writes a Markdown report |
+| Load | `data/loader.py` | Reads the Fama–French CSV, keeps monthly `YYYYMM` rows, converts % to decimals, builds X (factors at *t*) and y (Mkt-RF at *t+1*), drops the last month; refuses duplicated or out-of-order months |
 | Cache / hash | `data/pipeline.py` | Wraps the data in a `Dataset` with an MD5 hash of the source file for reproducibility |
 | Split | `data/preprocessing.py` | `time_series_split`: chronological train/test split, no shuffling |
 | Walk-forward | `evaluation/rolling.py` | Fixed-length rolling train/test folds; refits a fresh model per fold |
@@ -63,47 +64,74 @@ fixed in the config, MCLLR uncertainty is epistemic only. Results and limitation
 
 ---
 
-## 3. Improved pipeline (`lrd/improved`, in development)
+## 3. Improved pipeline (`lrd/improved`)
 
-Designed to fix the issues found in the assessment while keeping comparisons fair.
+Fixes the issues found in the assessment while keeping comparisons fair.
 
 ```
-1. Data validation + analysis report         (once, shared core)
-2. Shared chronological split / walk-forward folds   (once, shared core)
-3. For each model, using TRAINING data only:
-     a. model-specific preparation  (e.g. standardise factors, winsorise training features)
-     b. hyperparameter tuning       (inner walk-forward on the training window)
-     c. fit → predict on the test window
-4. Shared evaluation: metrics, calibration, significance vs historical mean
-5. Comparison: CLI report and Streamlit app (standard vs improved)
+1. Data validation + report                     (once, lrd.core.data.validation)
+2. Shared walk-forward folds                    (once, lrd.core.evaluation.rolling)
+3. For each model, inside every fold, on TRAINING data only:
+     a. model-specific preparation  (PreparedModel: standardise / winsorise)
+     b. hyperparameter tuning       (TunedModel: inner walk-forward on the training window)
+     c. fit → predict on the test window (point forecast + predictive std)
+4. Shared evaluation: metrics, calibration, OOS R² and Diebold–Mariano vs the benchmark
+5. Outputs: summary, folds, predictions, tuning log, validation report
+```
+
+Run it with:
+
+```bash
+python main.py --system improved            # outputs in results/improved/
+python main.py --system both --rolling      # standard and improved in one run
 ```
 
 ### Design rules
 
 1. **One split for every model.** Model-specific preparation happens *after* the shared
    split, so all models are scored on identical months.
-2. **Preparation is part of the model.** Each improved model learns its preparation
-   (scaling statistics, clipping thresholds) inside `fit()` from the training window and
-   only applies it in `predict()`. Walk-forward then relearns it in every fold, with no
-   leakage from test data.
-3. **Bias/variance is controlled by tuned hyperparameters** (bandwidth, ridge α,
-   neighbourhood size), selected on training data only.
-4. **Extreme months are kept.** Outliers are flagged in the data report, not deleted;
-   crash months are real data and decide most model rankings.
+2. **Preparation is part of the model.** `PreparedModel` learns its preparation (scaling
+   statistics, clipping thresholds) inside `fit()` from the training window and only
+   applies it in `predict()`. Walk-forward relearns it in every fold, with no leakage.
+3. **Bias/variance is controlled by tuned hyperparameters** (bandwidth, ridge α).
+   `TunedModel` selects them by an inner walk-forward on training data only.
+4. **Extreme months are kept.** Outliers are flagged in the validation report, not
+   deleted; crash months are real data and decide most model rankings.
 5. **Metrics are never computed inside models.** The shared evaluator guarantees
    identical definitions across systems.
+6. **Every model reports a predictive standard deviation**, so all are scored on
+   calibration as well as accuracy.
 
-### Planned contents
+### Components
 
-| Module | Purpose | Source of evidence |
-|---|---|---|
-| `lrd/core/data/validation.py` | Missing values, junk rows, date gaps, outlier flags, summary report | — |
-| `lrd/improved/preprocessing.py` | Train-only transformers (standardise, winsorise) | MODEL_ASSESSMENT §3 |
-| `lrd/improved/models/mcllr.py` | MCLLR + local ridge + standardised distances + predictive variance | Validated: +0.35% OOS R², 94% coverage (§4) |
-| `lrd/improved/tuning.py` | Nested walk-forward hyperparameter selection | §5.5 |
-| `experiments/improved/*.yaml` | Configs for the improved system | — |
-| `tests/improved/` | Tests for the above | — |
-| `main.py --system` | Run standard, improved or both | — |
+| Module | Purpose |
+|---|---|
+| `lrd/core/data/validation.py` | Raw-data checks and Markdown report (shared) |
+| `lrd/improved/preprocessing.py` | `Standardizer`, `Winsorizer` (train-only) and `PreparedModel` |
+| `lrd/improved/models/benchmark.py` | `HistoricalMean`: the benchmark every model must beat |
+| `lrd/improved/models/ridge.py` | `RidgeRegression` with residual-based predictive std |
+| `lrd/improved/models/mcllr.py` | `ImprovedMCLLR`: local ridge, Gumbel top-k sampling, batched fits, predictive std |
+| `lrd/improved/tuning.py` | `TunedModel`: nested walk-forward hyperparameter selection |
+| `lrd/improved/config.py` | YAML schema, validation and model construction |
+| `lrd/improved/pipeline.py` | `ImprovedPipeline` and `ImprovedResults` |
+| `experiments/improved/config_improved.yaml` | Default improved experiment |
+| `tests/improved/`, `tests/core/test_validation.py` | Tests, including leakage checks |
 
-The validated changes are prototyped in `scripts/improvement_study.py`; the full roadmap
-is in [MODEL_ASSESSMENT.md](MODEL_ASSESSMENT.md) §5.
+### Config format
+
+```yaml
+dataset_path: data/raw/F-F_Research_Data_5_Factors_2x3.csv
+random_state: 42
+benchmark: historical_mean          # OOS R² and DM tests are relative to this model
+evaluation: {train_window: 240, test_window: 12}
+tuning: {inner_train_window: 180, inner_test_window: 12}
+validation: {strict: true, outlier_threshold: 5.0}
+models:
+  - name: mcllr_improved            # unique label used in outputs
+    model_type: mcllr_improved      # historical_mean | ridge | mcllr_improved
+    preprocessing: [standardize]    # or {winsorize: 0.01}
+    params: {n_simulations: 50, subsample_size: 160}   # fixed
+    grid: {bandwidth: [1, 2, 3], alpha: [1, 3, 10, 30]} # tuned per fold
+```
+
+Results are in [MODEL_ASSESSMENT.md](MODEL_ASSESSMENT.md) §5; remaining work is in §6.

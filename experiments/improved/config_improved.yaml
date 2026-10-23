@@ -1,0 +1,44 @@
+# Improved pipeline (lrd.improved). Run with: python main.py --system improved
+#
+# - Every model is evaluated on the same walk-forward folds (lrd.core).
+# - preprocessing is fitted on each fold's training window only.
+# - grid values are tuned per fold by an inner walk-forward on the training
+#   window (inner_train_window + inner_test_window <= train_window).
+# - Features are standardised, so bandwidths are in standard deviations and
+#   ridge alphas are relative to sample size (penalty = alpha * n).
+dataset_path: data/raw/F-F_Research_Data_5_Factors_2x3.csv
+random_state: 42
+benchmark: historical_mean
+
+evaluation:
+  train_window: 240
+  test_window: 12
+
+tuning:
+  inner_train_window: 180
+  inner_test_window: 12
+
+validation:
+  strict: true            # stop if the data has missing/garbage/duplicate months
+  outlier_threshold: 5.0  # robust z-score above which values are flagged (never removed)
+
+models:
+  - name: historical_mean
+    model_type: historical_mean
+
+  - name: ridge
+    model_type: ridge
+    preprocessing: [standardize]
+    grid:
+      alpha: [0.1, 1.0, 3.0, 10.0, 30.0]
+
+  - name: mcllr_improved
+    model_type: mcllr_improved
+    preprocessing: [standardize]
+    params:
+      n_simulations: 50
+      subsample_size: 160
+      predictive_std: true
+    grid:
+      bandwidth: [1.0, 2.0, 3.0]
+      alpha: [1.0, 3.0, 10.0, 30.0]

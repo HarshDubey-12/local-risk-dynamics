@@ -2,14 +2,24 @@
 
 This document records what the experiments in this repository show about the proposed
 **Monte Carlo Local Linear Regression (MCLLR)** model, why it falls short of the
-hypothesis, and what needs to change to make it outperform the existing baselines.
+hypothesis, what the improved pipeline (`lrd/improved`) achieves, and what remains to be
+done.
 
 All numbers can be reproduced with:
 
 ```bash
-python scripts/improvement_study.py     # walk-forward study (~2 minutes)
-python main.py --rolling                # repository pipeline: hold-out + walk-forward
+python scripts/improvement_study.py     # walk-forward study of candidate fixes (~3 minutes)
+python main.py --system improved        # improved pipeline with nested tuning (~40 seconds)
+python main.py --rolling                # standard pipeline: hold-out + walk-forward
 ```
+
+> **Data correction (this revision).** The data validation added in the improved
+> pipeline found that the raw CSV contained a duplicated block: its first 73 lines were a
+> copy of the file header plus 68 months (Jul 1963 – Feb 1969). The loader had silently
+> used both copies, which double-counted those months and gave Feb 1969 a wrong target
+> (Jul 1963). The duplicate has been removed and the loader now refuses duplicated or
+> out-of-order months. All numbers below are on the corrected data. The conclusions are
+> unchanged; the earlier figures are preserved in the `v1-standard` tag.
 
 ---
 
@@ -17,10 +27,10 @@ python main.py --rolling                # repository pipeline: hold-out + walk-f
 
 | Question | Answer |
 |---|---|
-| Does MCLLR work as the theory proposes? | **No.** As implemented, it is **statistically significantly worse** than Ridge and the historical-mean benchmark. |
-| Does any model predict monthly market returns? | **No.** The best baseline (Ridge) is statistically indistinguishable from forecasting the historical mean. |
-| Are MCLLR's uncertainty estimates reliable? | **No.** Nominal 95% intervals cover only **37%** of outcomes. |
-| Can it be fixed? | **Partially.** Adding ridge shrinkage inside each local fit and a predictive-variance term makes it the **best model tested** (+0.35% out-of-sample R², 94% coverage), but the edge is **not yet statistically significant**. |
+| Does MCLLR work as the theory proposes? | **No.** As originally specified it is **statistically significantly worse** than Ridge and the historical-mean benchmark. |
+| Does any model predict monthly market returns? | **Barely.** No model significantly beats the historical mean. |
+| Are the original MCLLR's uncertainty estimates reliable? | **No.** Nominal 95% intervals cover only **37%** of outcomes. |
+| Does the improved MCLLR fix this? | **Partially.** With local ridge, standardised features and predictive variance, tuned honestly inside every fold, it is the **best model tested** (+0.36% out-of-sample R², best interval score and NLL, 94% coverage), but the edge is **not statistically significant** (p = 0.44). |
 
 ---
 
@@ -28,9 +38,9 @@ python main.py --rolling                # repository pipeline: hold-out + walk-f
 
 | Item | Setting |
 |---|---|
-| Data | Fama–French 5 factors, monthly, Jul 1963 – Oct 2025 (816 months) |
+| Data | Fama–French 5 factors, monthly, Jul 1963 – Oct 2025 (748 usable months after the t+1 shift) |
 | Task | Predict next month's market excess return (`Mkt-RF` at *t+1*) from the 5 factors at *t* |
-| Protocol | Walk-forward: 240-month training window, 12-month test window, refit every year → **48 folds, 576 test months (Nov 1977 – Oct 2025)** |
+| Protocol | Walk-forward: 240-month training window, 12-month test window, refit every year → **42 folds, 504 test months (Jul 1983 – Jun 2025)** |
 | Benchmark | **Historical mean** of the training window (the standard benchmark in return predictability) |
 | Main score | **Out-of-sample R² vs historical mean** = 1 − SSE(model) / SSE(mean). Positive ⇒ the model beats the mean. |
 | Significance | **Diebold–Mariano test** (squared loss) on monthly forecast errors |
@@ -38,21 +48,22 @@ python main.py --rolling                # repository pipeline: hold-out + walk-f
 
 ---
 
-## 2. Current state of the models
+## 2. Current state of the standard models
 
-### Walk-forward results (repository models, default configuration)
+### Walk-forward results (standard system, default configuration)
 
 | Model | RMSE | OOS R² vs mean | 95% coverage | DM vs Ridge |
 |---|---|---|---|---|
-| Historical mean | 0.04510 | 0.00% | – | equal (p = 0.84) |
-| **Ridge (α = 1)** | **0.04509** | **+0.05%** | – | – |
-| MC Linear | 0.04571 | −2.72% | 38% | worse (p = 0.09) |
-| Global OLS | 0.04580 | −3.12% | – | **worse (p = 0.03)** |
-| **MCLLR (proposed)** | **0.04634** | **−5.56%** | **37%** | **worse (p = 0.01)** |
-| LWLR | 0.04669 | −7.15% | – | **worse (p = 0.004)** |
+| Historical mean | 0.0448 | 0.00% | – | equal (p = 0.98) |
+| **Ridge (α = 1)** | **0.0448** | **+0.01%** | – | – |
+| Global OLS | 0.0455 | −3.28% | – | **worse (p = 0.04)** |
+| MC Linear | 0.0458 | −4.83% | 39% | **worse (p = 0.007)** |
+| **MCLLR (proposed)** | **0.0462** | **−6.60%** | **37%** | **worse (p = 0.01)** |
+| LWLR | 0.0464 | −7.38% | – | **worse (p = 0.005)** |
 
-The single 80/20 hold-out test (`python main.py`) gives the same ordering: every model has
-negative R² against the test-period mean, Ridge is best, MCLLR ranks fifth of seven.
+The single 80/20 hold-out test (`python main.py`) gives every model a negative R² against
+the test-period mean; Ridge ranks first and MCLLR second of seven there, but the hold-out
+covers only 150 months and the walk-forward ranking above is the more reliable one.
 
 ### Conclusions
 
@@ -60,18 +71,18 @@ negative R² against the test-period mean, Ridge is best, MCLLR ranks fifth of s
    significantly beats the historical mean. Ridge "wins" only because α = 1 is very strong
    shrinkage at this data scale (XᵀX has diagonal ≈ n·var ≈ 1), which pulls it almost
    all the way to the mean.
-2. **Locality hurts point forecasts.** Performance degrades monotonically with locality:
-   Global OLS > MCLLR > LWLR. The ranking holds before and after 2005 and with the
-   largest move (Sep 1987, −23%) excluded, so it is not driven by one period or outlier.
+2. **Locality hurts point forecasts as originally specified.** Both local models (MCLLR,
+   LWLR) are worse than global OLS, before and after 2005 and with the largest move
+   (Sep 1987, −23%) excluded, so it is not driven by one period or outlier.
 3. **The uncertainty estimates are badly over-confident.** MC Linear and MCLLR cover only
-   37–38% of outcomes with nominal 95% intervals.
-4. **Neither MCLLR component adds value as built.** Removing geometry
-   (`mcllr_no_geometry`) or stochasticity (`mcllr_no_stochasticity`) does not reveal a
-   component that is helping: the full model is still significantly worse than Ridge.
+   37–39% of outcomes with nominal 95% intervals.
+4. **Neither MCLLR component rescues it.** Removing geometry (`mcllr_no_geometry`) or
+   stochasticity (`mcllr_no_stochasticity`) does not reveal a component that is helping:
+   the full model is still significantly worse than Ridge.
 
 ---
 
-## 3. Why MCLLR under-performs
+## 3. Why the original MCLLR under-performs
 
 | Cause | Explanation |
 |---|---|
@@ -85,74 +96,90 @@ negative R² against the test-period mean, Ridge is best, MCLLR ranks fifth of s
 
 ## 4. Improvement experiments
 
-All candidates below were evaluated with the same 48-fold walk-forward protocol
-(`scripts/improvement_study.py`). Local ridge uses penalty `alpha × subsample_size`;
-standardised variants z-score the factors with training-window statistics before
-computing kernel distances.
+All candidates below were evaluated with the same 42-fold walk-forward protocol
+(`scripts/improvement_study.py`). Local ridge uses penalty `alpha × subsample_size` on
+raw-scale features; standardised variants z-score the factors with training-window
+statistics before computing kernel distances. Hyperparameters here were chosen on the
+same test period (see §5 for the bias-free version).
 
 | Variant | OOS R² vs mean | 95% coverage | DM vs Ridge | Verdict |
 |---|---|---|---|---|
-| MCLLR (current) | −5.56% | 37% | worse, p = 0.01 | baseline |
-| MCLLR, larger neighbourhood (m = 160) | −4.30% | 19% | worse, p = 0.03 | helps a little |
-| MCLLR, standardised distances only | −5.87% | 18% | worse, p = 0.01 | no help alone |
-| Global Ridge, tuned (α = 0.02·n) | +0.04% | – | equal, p = 0.95 | ≈ mean |
-| Bagged ridge (same as below, **no locality**) | +0.05% | 8% | equal, p = 1.00 | ≈ mean |
-| **MCLLR + local ridge** (standardised, bw = 2, m = 160) | **+0.35%** | 7% | better, p = 0.22 | **best accuracy** |
-| MCLLR + local ridge (bw = 1) | +0.39% | 4% | better, p = 0.30 | similar |
-| **MCLLR + local ridge + predictive std** | **+0.35%** | **94%** | better, p = 0.22 | **best overall** |
-| Recency-local MC + ridge + predictive std | −0.05% | 94% | equal, p = 0.81 | time locality ≈ mean |
+| MCLLR (original) | −6.60% | 37% | worse, p = 0.01 | baseline |
+| MCLLR, larger neighbourhood (m = 160) | −4.71% | 20% | worse, p = 0.03 | helps a little |
+| MCLLR, standardised distances only | −5.75% | 19% | worse, p = 0.01 | no help alone |
+| Global Ridge, tuned (α = 0.02·n) | +0.03% | – | equal, p = 0.92 | ≈ mean |
+| Bagged ridge (same as below, **no locality**) | −0.02% | 9% | equal, p = 0.93 | ≈ mean |
+| **MCLLR + local ridge** (standardised, bw = 2, m = 160) | **+0.30%** | 8% | better, p = 0.28 | **best accuracy** |
+| MCLLR + local ridge (bw = 1) | +0.30% | 4% | better, p = 0.37 | similar |
+| **MCLLR + local ridge + predictive std** | **+0.30%** | **94%** | better, p = 0.28 | **best overall** |
+| Recency-local MC + ridge + predictive std | 0.00% | 94% | equal, p = 0.99 | time locality ≈ mean |
 
 ### What the experiments show
 
 1. **Shrinkage inside each local fit is the decisive change.** It turns MCLLR from the
    second-worst model into the best one tested.
-2. **Locality adds value once variance is controlled.** MCLLR + local ridge (+0.35%)
-   beats the identical procedure without locality, bagged ridge (+0.05%), and tuned global
-   ridge (+0.04%). The result is stable across ridge strengths (α ∈ [0.02, 0.1] → +0.34% to
-   +0.36%) and is best with narrower kernels (bw = 1–2 standard deviations).
+2. **Locality adds value once variance is controlled.** MCLLR + local ridge (+0.30%)
+   beats the identical procedure without locality, bagged ridge (−0.02%), and tuned
+   global ridge (+0.03%). It is positive both before 2005 (+0.46%) and after (+0.13%).
 3. **Predictive variance fixes calibration.** Adding the local residual variance to the
-   Monte Carlo spread raises 95% coverage from 7% to **94%**, without changing the point
-   forecast. No baseline in the repository provides any uncertainty, so this is MCLLR's
-   clearest advantage.
-4. **The evidence is not yet conclusive.**
-   - The improvement over Ridge is **not statistically significant** (p ≈ 0.15–0.30).
-   - It is concentrated **before 2005** (+0.57%); after 2005 it is ≈ 0 (+0.06%).
-   - The variants were chosen on the same test period, so results carry mild
-     selection bias. They must be re-confirmed with nested tuning (see §5.5).
-
-For context, Campbell & Thompson (2008) show that a monthly OOS R² of roughly 0.5% can
-already be economically meaningful for a mean-variance investor. The improved model is in
-that range, which makes the direction worth pursuing, but not yet proven.
+   Monte Carlo spread raises 95% coverage from 8% to **94%** without changing the point
+   forecast.
+4. **These results carry selection bias.** The variants were chosen on the same test
+   months they are scored on. §5 removes that bias.
 
 ---
 
-## 5. Proposed changes
+## 5. Improved pipeline results (implemented in `lrd/improved`)
 
-Ordered by priority. Items 5.1–5.2 are validated by the experiments above; the rest are
-the next steps needed to make the improvement robust and significant.
+The validated changes are implemented as `ImprovedMCLLR` in the improved pipeline, which
+adds data validation, train-only preparation (standardisation) and **nested walk-forward
+tuning**: in every outer fold, bandwidth and ridge α are selected by an inner walk-forward
+(180-month inner train, 12-month inner test) on that fold's training window only. No test
+month influences any choice, so these are the headline numbers.
 
-### 5.1 Regularise the local fits *(validated: −5.56% → +0.35% OOS R²)*
+Configuration: `experiments/improved/config_improved.yaml` — Ridge tuned over
+α ∈ {0.1, 1, 3, 10, 30}; ImprovedMCLLR with K = 50, m = 160, predictive std, tuned over
+bandwidth ∈ {1, 2, 3} × α ∈ {1, 3, 10, 30}. Same 42 folds / 504 test months as above.
 
-- Add an `alpha` hyperparameter to `MonteCarloLocalLinearRegression` and solve each local
-  fit as ridge regression with an unpenalised intercept, penalty `alpha × subsample_size`.
-- Default `subsample_size` to ~160 instead of 80 (more data per local fit).
-- Compute kernel distances on **standardised** factors (z-scores from the training window)
-  so the bandwidth is in standard-deviation units and no factor dominates. Default
-  bandwidth ≈ 1–2.
-- Files: a new improved MCLLR in `lrd/improved/` (the original in
-  `lrd/standard/models/mcllr.py` stays unchanged as the reference), with its configs
-  in `experiments/improved/`.
+| Model | RMSE | OOS R² vs mean | DM vs mean | 95% coverage | Interval score ↓ | Gaussian NLL ↓ |
+|---|---|---|---|---|---|---|
+| Historical mean | 0.0448 | 0.00% | – | 94.1% | 0.2380 | −1.673 |
+| Ridge (tuned) | 0.0447 | +0.25% | p = 0.68 | 94.4% | 0.2364 | −1.676 |
+| **ImprovedMCLLR (tuned)** | **0.0447** | **+0.36%** | p = 0.44 | **94.3%** | **0.2345** | **−1.688** |
 
-### 5.2 Report predictive, not just epistemic, uncertainty *(validated: 37% → 94% coverage)*
+### Findings
 
-- For each simulation, record the residual variance of the local fit; return
-  `std = sqrt(var(Monte Carlo predictions) + mean(local residual variance))`.
-- Apply the same fix to `MonteCarloLinearRegression`.
-- Position MCLLR as the model that provides **calibrated, query-specific risk intervals**.
+1. **The improvement survives honest tuning.** ImprovedMCLLR remains the best model on
+   accuracy and on both proper uncertainty scores (interval score, NLL), with calibrated
+   95% intervals. Compared with the original MCLLR (−6.60%), the gap closed by the
+   improvements is almost 7 percentage points of OOS R².
+2. **It is still not statistically significant.** p = 0.44 against the historical mean;
+   the evidence is consistent with a small real edge but cannot establish one.
+3. **Hyperparameter choices are unstable across folds.** The inner search picks α = 1 in
+   22 folds and α = 30 in 16, and bandwidth 3 in 23 folds versus 1 in 15. With a signal
+   this weak, the inner validation error is nearly flat across candidates — another sign
+   that the remaining gains must come from better locality information, not more tuning.
 
-### 5.3 Define locality on regime (state) variables
+---
 
-The most promising untested change. Measure similarity on variables that describe the
+## 6. Proposed changes and status
+
+Ordered by priority.
+
+### 6.1 Regularise the local fits — ✅ implemented (`lrd/improved/models/mcllr.py`)
+
+Local ridge with penalty `alpha × subsample_size`, larger neighbourhoods (m = 160),
+kernel distances on standardised factors via the `standardize` preparation step.
+
+### 6.2 Predictive, not just epistemic, uncertainty — ✅ implemented
+
+`ImprovedMCLLR` returns `sqrt(var(Monte Carlo predictions) + mean(local residual
+variance))`; `RidgeRegression` and `HistoricalMean` return residual / sample standard
+deviations, so every improved model is scored on calibration.
+
+### 6.3 Define locality on regime (state) variables — ⬜ next
+
+The most promising remaining change. Measure similarity on variables that describe the
 market regime instead of on this month's factor returns, for example:
 
 - realised volatility of the market over the past 1–3 months,
@@ -161,73 +188,72 @@ market regime instead of on this month's factor returns, for example:
 - recent drawdown or 12-month momentum of the market.
 
 Keep the regression on the 5 factors, but compute kernel weights from the state vector.
-This matches the original hypothesis ("regime-dependent relationships") far better than
-distances between noisy return vectors.
+Realised volatility and momentum can be built from the existing data; the others need an
+additional data source.
 
-### 5.4 Shrink forecasts toward the historical mean
+### 6.4 Shrink forecasts toward the historical mean — ⬜
 
-- Combine forecasts: `ŷ = w · ŷ_MCLLR + (1 − w) · ȳ_train`, with `w` chosen in-sample.
+- Combine forecasts: `ŷ = w · ŷ_MCLLR + (1 − w) · ȳ_train`, with `w` tuned inside the fold.
 - Optionally apply the Campbell–Thompson restriction (truncate negative equity-premium
   forecasts at zero).
-- Both are standard, cheap, and typically add out-of-sample R² for weak predictors.
 
-### 5.5 Tune without look-ahead (nested walk-forward)
+### 6.5 Tune without look-ahead (nested walk-forward) — ✅ implemented (`lrd/improved/tuning.py`)
 
-- Select `bandwidth`, `alpha` and `subsample_size` inside each fold using only that fold's
-  training window (e.g. an inner walk-forward on the 240 training months), using the
-  existing `lrd/standard/experiments/tuning.py`.
-- Report the nested results as the headline numbers; this removes the selection bias
-  noted in §4.
+`TunedModel` runs an inner walk-forward inside every `fit`, so tuning never sees test data.
+See §5 for the results.
 
-### 5.6 Use the right tests and economic metrics
+### 6.6 Use the right tests and economic metrics — ⬜ partly done
 
-- **Clark–West test** (add next to Diebold–Mariano in `lrd/core/evaluation/significance.py`) for comparing a model against the historical mean, which is a
-  nested model (Diebold–Mariano is conservative in that case).
-- **Economic value**: certainty-equivalent return gains of a mean-variance investor
-  using the forecasts, and the Sharpe ratio of a market-timing strategy.
-- **Calibration**: coverage at several levels (50%, 80%, 95%), interval score, and
-  Gaussian NLL (already in `lrd/core/evaluation/metrics.py`).
-- Fix `lrd/core/evaluation/backtesting.py` to annualise monthly data with √12 (it currently
-  uses √252) and replace the error-based "pseudo-returns" with a real strategy return.
+- ✅ Diebold–Mariano and OOS R² in `lrd/core/evaluation/significance.py`.
+- ⬜ **Clark–West test** for comparisons against the nested historical-mean model
+  (add next to Diebold–Mariano, which is conservative in that case).
+- ⬜ **Economic value**: certainty-equivalent gains of a mean-variance investor and the
+  Sharpe ratio of a market-timing strategy.
+- ⬜ Fix `lrd/core/evaluation/backtesting.py` to annualise monthly data with √12 (it
+  currently uses √252) and replace the error-based "pseudo-returns" with a real strategy.
 
-### 5.7 Consider forecasting risk instead of returns
+### 6.7 Consider forecasting risk instead of returns — ⬜
 
 The project is named *Local Risk Dynamics*. Next-month **volatility** (or factor betas,
 or Value-at-Risk) is far more predictable than next-month returns and genuinely changes
 with the regime. A locality-based model is much more likely to beat global baselines on
 that target. The pipeline needs only a different target in `lrd/core/data/loader.py`.
 
-### 5.8 Engineering for larger studies
+### 6.8 Engineering for larger studies — ✅ partly done
 
-- Vectorise the Monte Carlo loop (batch least squares over simulations) and parallelise
-  across query points / folds (e.g. `joblib`). MCLLR is currently ~100× slower than the
-  global models, which limits nested tuning.
+`ImprovedMCLLR` samples all neighbourhoods at once (Gumbel top-k) and solves the local
+fits as one batched system: ~1 ms per query versus ~8 ms for the original (same machine,
+50 simulations). Parallelising
+across folds (e.g. `joblib`) remains open.
 
 ---
 
-## 6. Recommended framing for the write-up
+## 7. Recommended framing for the write-up
 
 > Stochastic locality on its own does **not** improve point forecasts of monthly market
 > excess returns; as originally specified, MCLLR is significantly worse than a ridge
-> baseline. With local shrinkage, MCLLR matches or slightly exceeds the strongest baseline
-> (+0.35% out-of-sample R², not significant), and with a predictive-variance correction it
-> is the only model that delivers calibrated, query-specific 95% intervals (94% coverage).
-> Defining locality on economic state variables and targeting risk rather than returns are
-> the most promising directions for a conclusive result.
+> baseline (−6.6% out-of-sample R²). With local ridge shrinkage, standardised distances
+> and predictive variance, and with hyperparameters tuned by nested walk-forward,
+> MCLLR becomes the best model tested (+0.36% OOS R² against the historical mean, best
+> interval score and predictive likelihood, 94% coverage of nominal 95% intervals), but
+> the edge is not statistically significant. Defining locality on economic state
+> variables and targeting risk rather than returns are the most promising directions for
+> a conclusive result.
 
 ---
 
-## 7. Status checklist
+## 8. Status checklist
 
 | Change | Status |
 |---|---|
-| Bandwidth on correct scale, MCLLR sampling stability, valid ablations | ✅ Done (in repository) |
+| Bandwidth on correct scale, MCLLR sampling stability, valid ablations | ✅ Done (standard system) |
 | Walk-forward evaluation, `main.py`, Streamlit comparison app | ✅ Done |
-| Local ridge in MCLLR (§5.1) | 🧪 Validated in `scripts/improvement_study.py`; not yet in `lrd/improved/` |
-| Predictive variance (§5.2) | 🧪 Validated in study script; not yet in `lrd/improved/` |
-| State-variable locality (§5.3) | ⬜ Not started (needs additional data) |
-| Shrinkage toward mean (§5.4) | ⬜ Not started |
-| Nested tuning (§5.5) | ⬜ Not started |
-| Clark–West, economic metrics, backtest fixes (§5.6) | ⬜ Not started |
-| Risk (volatility) target (§5.7) | ⬜ Not started |
-| Vectorised / parallel MCLLR (§5.8) | ⬜ Not started |
+| Raw-data validation; duplicated-month corruption found and fixed | ✅ Done (`lrd/core/data/validation.py`) |
+| Local ridge, standardised distances (§6.1) | ✅ Done (`lrd/improved`) |
+| Predictive variance (§6.2) | ✅ Done (`lrd/improved`) |
+| Nested tuning (§6.5) | ✅ Done (`lrd/improved/tuning.py`) |
+| State-variable locality (§6.3) | ⬜ Next |
+| Shrinkage toward mean (§6.4) | ⬜ Not started |
+| Clark–West, economic metrics, backtest fixes (§6.6) | ⬜ Not started |
+| Risk (volatility) target (§6.7) | ⬜ Not started |
+| Parallel fold evaluation (§6.8) | ⬜ Not started |

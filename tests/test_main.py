@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 import main
+from lrd.core.data.loader import load_fama_french
 from lrd.core.tracking import ExperimentTracker
 
 FAST_MODELS = ["global_linear", "ridge_linear", "mc_linear"]
@@ -22,7 +23,8 @@ def test_hold_out_run_writes_outputs(tmp_path):
     assert metrics["rmse"].notna().all()
 
     predictions = pd.read_csv(out / "predictions.csv")
-    assert len(predictions) == 164  # 20% hold-out of 816 months
+    n = len(load_fama_french("data/raw/F-F_Research_Data_5_Factors_2x3.csv")[1])
+    assert len(predictions) == n - int(n * 0.8)  # 20% hold-out
     assert {"date", "y_true", "global_linear_pred", "mc_linear_pred", "mc_linear_std"} <= set(
         predictions.columns
     )
@@ -45,10 +47,11 @@ def test_rolling_run_writes_fold_results(tmp_path):
     )
     assert code == 0
     folds = pd.read_csv(out / "rolling_folds.csv")
-    # (816 - 600) // 60 = 3 folds per model
+    n = len(load_fama_french("data/raw/F-F_Research_Data_5_Factors_2x3.csv")[1])
+    expected = (n - 600) // 60
     assert folds.groupby("model")["fold_id"].nunique().to_dict() == {
-        "global_linear": 3,
-        "mcllr": 3,
+        "global_linear": expected,
+        "mcllr": expected,
     }
     assert (out / "rolling_summary.csv").exists()
     assert not (out / "figures").exists()
@@ -84,3 +87,54 @@ def test_relative_paths_resolve_from_caller_directory(tmp_path, monkeypatch):
     code = main.main(["--config", str(config), "--output-dir", "rel_out", "--no-plots", "--no-track"])
     assert code == 0
     assert (tmp_path / "rel_out" / "metrics.csv").exists()
+
+
+SMALL_IMPROVED_CONFIG = """
+dataset_path: data/raw/F-F_Research_Data_5_Factors_2x3.csv
+random_state: 0
+benchmark: historical_mean
+evaluation: {train_window: 120, test_window: 120}
+tuning: {inner_train_window: 60, inner_test_window: 30}
+models:
+  - {name: historical_mean, model_type: historical_mean}
+  - name: ridge
+    model_type: ridge
+    preprocessing: [standardize]
+    grid: {alpha: [0.1, 10.0]}
+  - name: mcllr_improved
+    model_type: mcllr_improved
+    preprocessing: [standardize]
+    params: {n_simulations: 5, subsample_size: 40}
+"""
+
+
+def test_improved_system_writes_outputs(tmp_path):
+    config = tmp_path / "improved.yaml"
+    config.write_text(SMALL_IMPROVED_CONFIG)
+    out = tmp_path / "out"
+    code = main.main(["--system", "improved", "--improved-config", str(config),
+                      "--output-dir", str(out), "--no-track"])
+    assert code == 0
+    summary = pd.read_csv(out / "improved" / "summary.csv")
+    assert list(summary["model"]) == ["historical_mean", "ridge", "mcllr_improved"]
+    assert (out / "improved" / "validation_report.md").exists()
+    assert not (out / "metrics.csv").exists()  # standard system did not run
+
+
+def test_improved_model_filter_keeps_benchmark(tmp_path):
+    config = tmp_path / "improved.yaml"
+    config.write_text(SMALL_IMPROVED_CONFIG)
+    code = main.main(["--system", "improved", "--improved-config", str(config), "--models", "ridge",
+                      "--output-dir", str(tmp_path / "out"), "--no-track"])
+    assert code == 0
+    summary = pd.read_csv(tmp_path / "out" / "improved" / "summary.csv")
+    assert list(summary["model"]) == ["historical_mean", "ridge"]
+
+
+def test_improved_unknown_model_fails_cleanly(tmp_path, capsys):
+    config = tmp_path / "improved.yaml"
+    config.write_text(SMALL_IMPROVED_CONFIG)
+    code = main.main(["--system", "improved", "--improved-config", str(config), "--models", "nope",
+                      "--output-dir", str(tmp_path), "--no-track"])
+    assert code == 1
+    assert "nope" in capsys.readouterr().err
