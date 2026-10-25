@@ -1,9 +1,8 @@
-# Python requirements
-pandas
-numpy
-matplotlib
-pyyaml
-streamlit>=1.40
-altair>=5
-jupyter
-pytest
+# Runtime dependencies, pinned to the versions all published results were produced with.
+# Python 3.11-3.13. Development tools (tests, notebooks): requirements-dev.txt
+numpy==2.3.0
+pandas==2.3.0
+matplotlib==3.10.8
+PyYAML==6.0.2
+streamlit==1.45.1
+altair==5.5.0

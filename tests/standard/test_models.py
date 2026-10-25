@@ -115,6 +115,32 @@ class TestMCLLRStability:
         actual = model._sampling_probabilities(model._compute_kernel_weights(x0))
         np.testing.assert_allclose(actual, expected, rtol=1e-10)
 
+
+class TestLWLRStability:
+    def test_tiny_bandwidth_does_not_silently_return_zero(self, sample_data):
+        X_train, X_test, y_train, _ = sample_data
+        pred = LocallyWeightedLinearRegression(bandwidth=1e-4).fit(X_train, y_train).predict(X_test[:10])
+        assert np.isfinite(pred).all()
+        assert np.any(pred != 0.0)
+
+    def test_relative_weights_leave_fit_unchanged(self, sample_data):
+        X_train, X_test, y_train, _ = sample_data
+        model = LocallyWeightedLinearRegression(bandwidth=0.08).fit(X_train, y_train)
+        x0 = X_test[0]
+        raw = np.exp(-np.sum((X_train - x0) ** 2, axis=1) / (2 * 0.08**2))
+        D = np.hstack([np.ones((len(X_train), 1)), X_train])
+        beta = np.linalg.pinv(D.T @ (D * raw[:, None])) @ (D.T @ (raw * y_train))
+        assert model.predict(X_test[:1])[0] == pytest.approx(np.r_[1.0, x0] @ beta, rel=1e-6)
+
+    def test_compact_kernel_without_neighbours_raises(self, sample_data):
+        from lrd.core.utils.kernels import EpanechnikovKernel
+
+        X_train, _, y_train, _ = sample_data
+        model = LocallyWeightedLinearRegression(0.01, kernel=EpanechnikovKernel(0.01)).fit(X_train, y_train)
+        with pytest.raises(ValueError, match="increase the bandwidth"):
+            model.predict(X_train[:1] + 10.0)
+
+
 class TestLocality:
     def test_comparison_config_bandwidths_induce_locality(self, sample_data):
         X_train, X_test, _, _ = sample_data

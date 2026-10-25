@@ -11,9 +11,9 @@ from app import charts, engine
 from lrd import comparison as cmp
 
 LEADERBOARD = {
-    "label": "Model", "system": "System", "rmse": "RMSE", "oos_r2_%": "OOS R² vs mean (%)", "dm_p": "DM p vs mean",
-    "coverage_95": "95% coverage", "interval_score_95": "Interval score", "gaussian_nll": "Gaussian NLL",
-    "folds_won": "Folds won",
+    "label": "Model", "system": "System", "rmse": "RMSE", "oos_r2_%": "OOS R² vs mean (%)", "cw_p": "CW p",
+    "dm_p": "DM p", "coverage_95": "95% coverage", "interval_score_95": "Interval score",
+    "gaussian_nll": "Gaussian NLL", "cer_gain_%": "CER gain (%/yr)", "sharpe": "Sharpe", "folds_won": "Folds won",
 }
 
 
@@ -22,15 +22,19 @@ def _leaderboard(summary: pd.DataFrame) -> None:
     st.dataframe(
         charts.styled_table(
             table,
-            {"RMSE": "{:.4f}", "OOS R² vs mean (%)": "{:+.2f}", "DM p vs mean": "{:.3f}", "95% coverage": "{:.1%}",
-             "Interval score": "{:.4f}", "Gaussian NLL": "{:.3f}", "Folds won": "{:d}"},
+            {"RMSE": "{:.4f}", "OOS R² vs mean (%)": "{:+.2f}", "CW p": "{:.3f}", "DM p": "{:.3f}",
+             "95% coverage": "{:.1%}", "Interval score": "{:.4f}", "Gaussian NLL": "{:.3f}",
+             "CER gain (%/yr)": "{:+.2f}", "Sharpe": "{:.2f}", "Folds won": "{:d}"},
             lower_better=["RMSE", "Interval score", "Gaussian NLL"],
-            higher_better=["OOS R² vs mean (%)", "Folds won"],
+            higher_better=["OOS R² vs mean (%)", "CER gain (%/yr)", "Sharpe", "Folds won"],
         ),
         hide_index=True, use_container_width=True,
     )
     st.caption("Green = best in column. 95% coverage should be close to 95%, not maximal. "
-               "DM p-values below 0.05 would indicate a significant difference from the benchmark.")
+               "CW = Clark–West test against the nested historical-mean benchmark (one-sided, the appropriate test "
+               "here); DM = Diebold–Mariano (two-sided). Values below 0.05 would be significant. CER gain: extra "
+               "certainty-equivalent return per year for a mean-variance investor (γ = 3) timing the market with "
+               "the model instead of the historical mean.")
 
 
 def _significance_matrix(selected, labels) -> None:

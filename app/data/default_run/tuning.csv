@@ -83,3 +83,45 @@ fold_id,test_start_date,chosen,inner_mse,key
 39,2022-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 30.0}",0.0027234945403250828,improved:mcllr_improved
 40,2023-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 30.0}",0.0031460852475820498,improved:mcllr_improved
 41,2024-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""bandwidth"": 3.0, ""alpha"": 30.0}",0.0028952199761872804,improved:mcllr_improved
+0,1983-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 1.0}",0.0024217195985150103,improved:mcllr_regime
+1,1984-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 1.0, ""alpha"": 1.0}",0.0021614789368309337,improved:mcllr_regime
+2,1985-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 1.0, ""alpha"": 1.0}",0.0018210753668860581,improved:mcllr_regime
+3,1986-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 1.0, ""alpha"": 1.0}",0.0018870639981026405,improved:mcllr_regime
+4,1987-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 1.0}",0.00203935696258082,improved:mcllr_regime
+5,1988-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 1.0, ""alpha"": 1.0}",0.0026330073976998246,improved:mcllr_regime
+6,1989-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 1.0, ""alpha"": 1.0}",0.0027198784847313503,improved:mcllr_regime
+7,1990-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 1.0}",0.0026659383783432388,improved:mcllr_regime
+8,1991-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 1.0}",0.0027735626684886588,improved:mcllr_regime
+9,1992-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 1.0}",0.002491954187596033,improved:mcllr_regime
+10,1993-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 1.0}",0.0013754178301832467,improved:mcllr_regime
+11,1994-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 1.0}",0.0012730069946219646,improved:mcllr_regime
+12,1995-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 1.0}",0.001114149634841572,improved:mcllr_regime
+13,1996-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 30.0}",0.0007493704094947681,improved:mcllr_regime
+14,1997-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 1.0, ""alpha"": 30.0}",0.000827803876983854,improved:mcllr_regime
+15,1998-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 30.0}",0.0010130501158224733,improved:mcllr_regime
+16,1999-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 30.0}",0.0017123072642868929,improved:mcllr_regime
+17,2000-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 30.0}",0.0020115318935675385,improved:mcllr_regime
+18,2001-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 30.0}",0.002708620846034454,improved:mcllr_regime
+19,2002-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 30.0}",0.0030350063402792443,improved:mcllr_regime
+20,2003-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 10.0}",0.0033557349678960016,improved:mcllr_regime
+21,2004-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 10.0}",0.0026550286231320406,improved:mcllr_regime
+22,2005-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 1.0}",0.0023403454210389053,improved:mcllr_regime
+23,2006-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 1.0}",0.0015841646531691426,improved:mcllr_regime
+24,2007-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 1.0}",0.0010190437281576798,improved:mcllr_regime
+25,2008-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 1.0}",0.0007886066843597191,improved:mcllr_regime
+26,2009-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 1.0, ""alpha"": 1.0}",0.002131628586652831,improved:mcllr_regime
+27,2010-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 1.0}",0.0024502657495060753,improved:mcllr_regime
+28,2011-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 1.0}",0.0026908554855410347,improved:mcllr_regime
+29,2012-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 1.0}",0.003128313574821009,improved:mcllr_regime
+30,2013-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 1.0}",0.002948573869453541,improved:mcllr_regime
+31,2014-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 1.0}",0.0016290291493936168,improved:mcllr_regime
+32,2015-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 0.5, ""alpha"": 1.0}",0.0013282185003577738,improved:mcllr_regime
+33,2016-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 30.0}",0.0013661383554353656,improved:mcllr_regime
+34,2017-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 30.0}",0.0008907898880730621,improved:mcllr_regime
+35,2018-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 30.0}",0.0008475194248382708,improved:mcllr_regime
+36,2019-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 30.0}",0.001282572457916715,improved:mcllr_regime
+37,2020-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 30.0}",0.0020118665183149857,improved:mcllr_regime
+38,2021-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 30.0}",0.00208945648227204,improved:mcllr_regime
+39,2022-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 30.0}",0.0027079193960361393,improved:mcllr_regime
+40,2023-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 30.0}",0.003128907036342024,improved:mcllr_regime
+41,2024-07-01,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""bandwidth"": 2.0, ""alpha"": 30.0}",0.0028841913744841346,improved:mcllr_regime

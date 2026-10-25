@@ -4,10 +4,22 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "local-risk-dynamics"
-version = "0.2.0"
+version = "1.0.0"
 description = "Deterministic vs stochastic locality in linear models for financial risk"
 readme = "README.md"
-requires-python = ">=3.10"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = [
+    "numpy==2.3.0",
+    "pandas==2.3.0",
+    "matplotlib==3.10.8",
+    "PyYAML==6.0.2",
+    "streamlit==1.45.1",
+    "altair==5.5.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.0.2", "notebook>=7,<8", "nbconvert>=7,<8", "ipykernel>=6,<8"]
 
 [tool.setuptools.packages.find]
 include = ["lrd*"]

@@ -6,7 +6,7 @@ import numpy as np
 from lrd.standard.config import ExperimentConfig
 from lrd.core.data.pipeline import DataPipeline
 from lrd.core.data.preprocessing import time_series_split
-from lrd.standard.models.factory import Modelfactory
+from lrd.standard.models.factory import ModelFactory
 from lrd.core.evaluation.evaluator import Evaluator
 
 class ExperimentRunner:
@@ -57,7 +57,7 @@ class ExperimentRunner:
         for model_config in self.config.models:
             print(f"\nTraining {model_config.model_type}...")
 
-            model = Modelfactory.create(model_config)
+            model = ModelFactory.create(model_config)
             model.fit(X_train, y_train)
 
             eval_result = Evaluator.evaluate(

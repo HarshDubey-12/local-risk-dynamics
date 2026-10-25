@@ -165,6 +165,29 @@ MODELS: dict[str, dict] = {
         "cons": "Edge over the benchmark is not statistically significant; tuned values vary between folds.",
         "cost": "K batched ridge solves per query.",
     },
+    "improved:mcllr_regime": {
+        "label": "MCLLR (regime state)",
+        "family": "Stochastic local, regime-based", "locality": "Market regime (trailing volatility, momentum)",
+        "uncertainty": "Predictive (spread + residual variance)", "local": False,
+        "short": "Improved MCLLR whose neighbourhoods are months in a similar market regime.",
+        "idea": "Tests the hypothesis directly: instead of comparing this month's noisy factor returns, the kernel "
+                "compares the market regime — trailing 12-month volatility and momentum of the market, built only "
+                "from past data. The local ridge regressions still use the five factors.",
+        "steps": ["Standardise factors with training-window statistics.",
+                  "Compute each month's state: 12-month trailing volatility and cumulative market return.",
+                  "Weight training months by a Gaussian kernel of their state distance to the query month.",
+                  "Sample K neighbourhoods, fit local ridge regressions on the factors, predict.",
+                  "Report mean prediction and predictive standard deviation; tune bandwidth and α per fold."],
+        "formula": r"s_t=\big(\operatorname{sd}(r_{t-11..t}),\ \textstyle\sum r_{t-11..t}\big),\quad "
+                   r"w_i=\exp\!\Big(-\tfrac{\lVert s_i-s_0\rVert^2}{2\tau^2}\Big)",
+        "params": {"bandwidth": "Kernel width in standard deviations of the state (tuned).",
+                   "alpha": "Local ridge penalty relative to m (tuned).",
+                   "state_window": "Months used for the trailing state (12).",
+                   "n_simulations (K)": "Neighbourhoods per query.", "subsample_size (m)": "Months per neighbourhood."},
+        "pros": "Locality defined by economic regime, as the hypothesis intends; no look-ahead in the state.",
+        "cons": "Two state variables only; requires chronological, contiguous training and query rows.",
+        "cost": "Same as improved MCLLR.",
+    },
 }
 
 SYSTEMS = {"standard": "Standard system", "improved": "Improved system"}
@@ -180,7 +203,10 @@ PRACTICES = [
     ("Train-only preparation", "Scaling and clipping are learned on each fold's training window, never on test data."),
     ("Honest tuning", "Hyperparameters are chosen by an inner walk-forward inside the training window."),
     ("Outliers kept", "Crash months are flagged, not deleted — they decide most rankings."),
-    ("Benchmark and significance", "Every model is compared with the historical mean using out-of-sample R² and a Diebold–Mariano test."),
+    ("Benchmark and significance", "Every model is compared with the historical mean using out-of-sample R², "
+                                   "Diebold–Mariano and Clark–West tests."),
+    ("Economic value", "Forecasts are also judged by what a market-timing investor would gain from them."),
+    ("Robustness", "Results are checked over several random seeds and training windows (reports/)."),
     ("Calibration", "Uncertainty is checked: a 95% interval should contain about 95% of outcomes."),
     ("Validated data", "The raw file is checked for missing, garbage, duplicate and missing months before use."),
 ]
@@ -189,7 +215,12 @@ METRICS = {
     "rmse": ("RMSE", "Root mean squared forecast error (decimal return). Lower is better."),
     "mae": ("MAE", "Mean absolute forecast error. Lower is better."),
     "oos_r2_%": ("OOS R² vs mean", "1 − SSE(model)/SSE(historical mean), in %. Above 0 beats the benchmark."),
-    "dm_p": ("DM p-value", "Diebold–Mariano test vs the benchmark; below 0.05 would be significant."),
+    "dm_p": ("DM p-value", "Diebold–Mariano test vs the benchmark (two-sided); below 0.05 would be significant."),
+    "cw_p": ("CW p-value", "Clark–West test vs the nested historical-mean benchmark (one-sided: model better). "
+                           "The appropriate test here; below 0.05 would be significant."),
+    "cer_gain_%": ("CER gain", "Extra certainty-equivalent return (% per year) for a mean-variance investor "
+                               "(γ = 3) timing the market with the model instead of the historical mean."),
+    "sharpe": ("Sharpe", "Annualised Sharpe ratio of that market-timing portfolio."),
     "coverage_95": ("95% coverage", "Share of outcomes inside the 95% interval. Target ≈ 95%."),
     "interval_score_95": ("Interval score", "Width plus penalties for misses (proper score). Lower is better."),
     "gaussian_nll": ("Gaussian NLL", "Predictive log-loss; punishes over-confidence. Lower is better."),

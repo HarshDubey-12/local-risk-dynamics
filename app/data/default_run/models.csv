@@ -9,3 +9,4 @@ standard:mcllr_no_stochasticity,standard,mcllr_no_stochasticity,walk_forward,"{"
 improved:historical_mean,improved,historical_mean,walk_forward,{}
 improved:ridge,improved,ridge,walk_forward,"{""preprocessing"": [""standardize""], ""grid"": {""alpha"": [0.1, 1.0, 3.0, 10.0, 30.0]}}"
 improved:mcllr_improved,improved,mcllr_improved,walk_forward,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""preprocessing"": [""standardize""], ""grid"": {""bandwidth"": [1.0, 2.0, 3.0], ""alpha"": [1.0, 3.0, 10.0, 30.0]}}"
+improved:mcllr_regime,improved,mcllr_regime,walk_forward,"{""n_simulations"": 50, ""subsample_size"": 160, ""predictive_std"": true, ""state_window"": 12, ""preprocessing"": [""standardize""], ""grid"": {""bandwidth"": [0.5, 1.0, 2.0], ""alpha"": [1.0, 10.0, 30.0]}}"

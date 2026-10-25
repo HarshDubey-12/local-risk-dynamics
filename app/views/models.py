@@ -33,10 +33,15 @@ IMPROVED_FIXED = {
                        ("alpha", "select", [0.3, 1.0, 3.0, 10.0, 30.0, 100.0], 10.0),
                        ("n_simulations", "slider", (10, 200, 10), 50), ("subsample_size", "slider", (40, 240, 10), 160),
                        ("predictive_std", "toggle", None, True)],
+    "mcllr_regime": [("bandwidth", "select", [0.25, 0.5, 1.0, 2.0, 3.0], 1.0),
+                     ("alpha", "select", [0.3, 1.0, 3.0, 10.0, 30.0, 100.0], 10.0),
+                     ("n_simulations", "slider", (10, 200, 10), 50), ("subsample_size", "slider", (40, 240, 10), 160),
+                     ("state_window", "slider", (3, 36, 3), 12), ("predictive_std", "toggle", None, True)],
 }
 IMPROVED_GRID = {
     "ridge": {"alpha": [0.1, 1.0, 3.0, 10.0, 30.0, 100.0]},
     "mcllr_improved": {"bandwidth": [0.5, 1.0, 2.0, 3.0, 5.0], "alpha": [0.3, 1.0, 3.0, 10.0, 30.0, 100.0]},
+    "mcllr_regime": {"bandwidth": [0.25, 0.5, 1.0, 2.0, 3.0], "alpha": [0.3, 1.0, 3.0, 10.0, 30.0, 100.0]},
 }
 LOCAL_SCALE = {"standard": "raw decimal returns", "improved": "standardised factors (σ units)"}
 
@@ -91,14 +96,19 @@ def _settings_form(key: str, info: dict, default_run: cmp.ModelRun):
 
 def _metric_tiles(run: cmp.ModelRun, bench: cmp.ModelRun) -> None:
     row = cmp.summarize([run], bench).iloc[0]
-    cols = st.columns(5)
+    cols = st.columns(6)
     cols[0].metric("RMSE", f"{row['rmse']:.4f}")
     cols[1].metric("OOS R² vs mean", f"{row['oos_r2_%']:+.2f}%")
-    cols[2].metric("DM p-value vs mean", f"{row['dm_p']:.2f}", help="Below 0.05 would be a significant difference.")
+    cols[2].metric("CW p-value", f"{row['cw_p']:.2f}",
+                   help=f"Clark–West test vs the historical mean (one-sided); below 0.05 would be significant. "
+                        f"Diebold–Mariano p = {row['dm_p']:.2f}.")
     cols[3].metric("95% coverage", "n/a" if np.isnan(row["coverage_95"]) else f"{row['coverage_95']:.0%}",
                    help="Target ≈ 95%. Not available for models without uncertainty.")
     cols[4].metric("Interval score", "n/a" if np.isnan(row["interval_score_95"]) else f"{row['interval_score_95']:.3f}",
                    help="Lower is better.")
+    cols[5].metric("CER gain", f"{row['cer_gain_%']:+.2f}%/yr",
+                   help="Extra certainty-equivalent return per year for a mean-variance investor (γ = 3) "
+                        "timing the market with this model instead of the historical mean.")
 
 
 def _per_fold(run: cmp.ModelRun, bench: cmp.ModelRun, label: str) -> None:
@@ -184,13 +194,14 @@ def _locality(run: cmp.ModelRun, bandwidth: float) -> None:
 def _mcllr_head_to_head() -> None:
     runs = engine.default_runs()
     original, improved = runs["standard:mcllr"], runs["improved:mcllr_improved"]
-    table = cmp.summarize([original, improved], runs[cmp.BENCHMARK_KEY]).set_index("key")
-    table.index = ["MCLLR (original)", "MCLLR (improved)"]
-    cols = ["rmse", "oos_r2_%", "dm_p", "coverage_95", "interval_score_95", "gaussian_nll"]
+    regime = runs["improved:mcllr_regime"]
+    table = cmp.summarize([original, improved, regime], runs[cmp.BENCHMARK_KEY]).set_index("key")
+    table.index = ["MCLLR (original)", "MCLLR (improved)", "MCLLR (regime state)"]
+    cols = ["rmse", "oos_r2_%", "cw_p", "coverage_95", "interval_score_95", "cer_gain_%"]
     st.dataframe(charts.styled_table(
-        table[cols], {"rmse": "{:.4f}", "oos_r2_%": "{:+.2f}%", "dm_p": "{:.3f}", "coverage_95": "{:.0%}",
-                      "interval_score_95": "{:.3f}", "gaussian_nll": "{:.3f}"},
-        lower_better=["rmse", "interval_score_95", "gaussian_nll"], higher_better=["oos_r2_%"],
+        table[cols], {"rmse": "{:.4f}", "oos_r2_%": "{:+.2f}%", "cw_p": "{:.3f}", "coverage_95": "{:.0%}",
+                      "interval_score_95": "{:.3f}", "cer_gain_%": "{:+.2f}"},
+        lower_better=["rmse", "interval_score_95"], higher_better=["oos_r2_%", "cer_gain_%"],
     ), use_container_width=True)
     t, p = diebold_mariano(improved.errors, original.errors)
     st.caption(f"Improved vs original MCLLR: Diebold–Mariano t = {t:.2f}, p = {p:.3f} "
@@ -266,7 +277,7 @@ def render() -> None:
         tab_names.append("Tuning")
     if info["local"]:
         tab_names.append("Locality explorer")
-    if default_run.model_type in ("mcllr", "mcllr_improved"):
+    if default_run.model_type in ("mcllr", "mcllr_improved", "mcllr_regime"):
         tab_names.append("Original vs improved")
     tabs = dict(zip(tab_names, st.tabs(tab_names)))
 

@@ -97,7 +97,7 @@ class LocallyWeightedLinearRegression(LocalRiskModel):
         y_pred = np.zeros(X_query.shape[0])
 
         for i, x0 in enumerate(X_query):
-            weights = self.kernel(X_train, x0)
+            weights = self._weights(X_train, x0)
 
             # Avoid explicit diagonal matrix
             W = weights[:, np.newaxis]
@@ -109,9 +109,28 @@ class LocallyWeightedLinearRegression(LocalRiskModel):
             beta = np.linalg.pinv(A) @ b
 
             x0_design = self._add_intercept(x0.reshape(1, -1))
-            y_pred[i] = float(x0_design @ beta)
+            y_pred[i] = (x0_design @ beta).item()
 
         return y_pred
+
+    def _weights(self, X_train: np.ndarray, x0: np.ndarray) -> np.ndarray:
+        """Kernel weights for one query point, guarded against all-zero weights.
+
+        Weighted least squares is unchanged by rescaling all weights, so the
+        Gaussian kernel is evaluated relative to the nearest training point;
+        otherwise every weight underflows to zero for small bandwidths and the
+        fit silently returns 0.
+        """
+        if isinstance(self.kernel, GaussianKernel):
+            sq_dist = np.sum((X_train - x0) ** 2, axis=1)
+            return np.exp(-(sq_dist - sq_dist.min()) / (2 * self.kernel.bandwidth ** 2))
+        weights = self.kernel(X_train, x0)
+        if not np.any(weights > 0):
+            raise ValueError(
+                f"All {self.kernel.name} kernel weights are zero for a query point; "
+                "increase the bandwidth."
+            )
+        return weights
 
     # --------------------------------------------------------------
 

@@ -7,13 +7,13 @@ from typing import Any, Dict, List
 import numpy as np
 import pandas as pd
 
-from lrd.standard.config import ModelCofig
+from lrd.standard.config import ModelConfig
 from lrd.core.evaluation.rolling import (
     evaluate_walk_forward,
     rolling_results_to_frame,
     summarize_rolling_metrics,
 )
-from lrd.standard.models.factory import Modelfactory
+from lrd.standard.models.factory import ModelFactory
 
 
 def _iter_grid(param_grid: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
@@ -23,7 +23,7 @@ def _iter_grid(param_grid: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
 
 
 def tune_model_with_walk_forward(
-    base_model_config: ModelCofig,
+    base_model_config: ModelConfig,
     param_grid: Dict[str, List[Any]],
     X: np.ndarray,
     y: np.ndarray,
@@ -43,7 +43,7 @@ def tune_model_with_walk_forward(
         model_config = replace(base_model_config, **params)
 
         def builder():
-            return Modelfactory.create(model_config)
+            return ModelFactory.create(model_config)
 
         folds = evaluate_walk_forward(
             model_builder=builder,

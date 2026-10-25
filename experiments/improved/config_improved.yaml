@@ -42,3 +42,17 @@ models:
     grid:
       bandwidth: [1.0, 2.0, 3.0]
       alpha: [1.0, 3.0, 10.0, 30.0]
+
+  # Locality on the market regime (trailing 12-month volatility and momentum)
+  # instead of on this month's factor returns; regression still on the factors.
+  - name: mcllr_regime
+    model_type: mcllr_regime
+    preprocessing: [standardize]
+    params:
+      n_simulations: 50
+      subsample_size: 160
+      predictive_std: true
+      state_window: 12
+    grid:
+      bandwidth: [0.5, 1.0, 2.0]
+      alpha: [1.0, 10.0, 30.0]

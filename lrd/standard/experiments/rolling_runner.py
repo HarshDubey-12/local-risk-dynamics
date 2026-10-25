@@ -13,7 +13,7 @@ from lrd.core.evaluation.rolling import (
     rolling_results_to_frame,
     summarize_rolling_metrics,
 )
-from lrd.standard.models.factory import Modelfactory
+from lrd.standard.models.factory import ModelFactory
 
 
 class RollingExperimentRunner:
@@ -45,7 +45,7 @@ class RollingExperimentRunner:
         all_summary_frames = []
         for model_config in self.config.models:
             def builder():
-                return Modelfactory.create(model_config)
+                return ModelFactory.create(model_config)
 
             fold_results = evaluate_walk_forward(
                 model_builder=builder,

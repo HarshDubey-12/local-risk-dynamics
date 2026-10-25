@@ -25,7 +25,7 @@ _REQUIRED_PARAMS: Dict[str, tuple[str, ...]] = {
 }
 
 @dataclass
-class ModelCofig:
+class ModelConfig:
     """Configuration for any model in the framework."""
     model_type: ModelType
     fit_intercept: bool = True
@@ -57,7 +57,7 @@ class ModelCofig:
             raise ValueError("alpha must be non-negative.")
 
     @classmethod
-    def from_yaml(cls, path:str | Path) -> "ModelCofig":
+    def from_yaml(cls, path:str | Path) -> "ModelConfig":
         with open(path) as f:
             config_dict = yaml.safe_load(f)
         return cls(**config_dict)
@@ -71,7 +71,7 @@ class ExperimentConfig:
     """Experiment-level settings."""
     dataset_path: str
     train_ratio: float
-    models: list[ModelCofig]
+    models: list[ModelConfig]
     random_state: int = 42
 
     def __post_init__(self):
@@ -97,6 +97,6 @@ class ExperimentConfig:
                 f"Experiment config {path} is missing required keys: {sorted(missing)}"
             )
         config_dict["models"] = [
-            ModelCofig(**m) for m in config_dict["models"]
+            ModelConfig(**m) for m in config_dict["models"]
         ]
         return cls(**config_dict)

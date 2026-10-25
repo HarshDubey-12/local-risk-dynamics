@@ -6,10 +6,10 @@ from lrd.standard.models.mc_linear import MonteCarloLinearRegression
 from lrd.standard.models.mcllr import MonteCarloLocalLinearRegression
 from lrd.standard.models.mcllr_ablations import MCLLRNoGeometry, MCLLRNoStochasticity
 from lrd.standard.models.ridge_linear import RidgeLinearRegression
-from lrd.standard.config import ModelCofig
+from lrd.standard.config import ModelConfig
 
-class Modelfactory:
-    """Registry pattern for model instatntiation."""
+class ModelFactory:
+    """Registry pattern for model instantiation."""
 
     _registry: Dict[str, Type[LocalRiskModel]] = {
         "global_linear": GlobalLinearRegression,
@@ -22,7 +22,7 @@ class Modelfactory:
     }
 
     @classmethod
-    def create(cls, config: ModelCofig) -> LocalRiskModel:
+    def create(cls, config: ModelConfig) -> LocalRiskModel:
         """Instantiate model from config."""
         model_cls = cls._registry.get(config.model_type)
         if model_cls is None:

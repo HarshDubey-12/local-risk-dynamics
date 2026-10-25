@@ -96,8 +96,11 @@ class ImprovedMCLLR(LocalRiskModel):
         keys = log_weights + gumbel
         return np.argpartition(-keys, self.subsample_size - 1, axis=1)[:, : self.subsample_size]
 
-    def _predict_one(self, x0: np.ndarray) -> tuple[float, float]:
-        sq_dist = np.sum((self.X_train_ - x0) ** 2, axis=1)
+    def _query_distances(self, X: np.ndarray) -> np.ndarray:
+        """Squared kernel distances (n_query, n_train); subclasses may use other locality spaces."""
+        return np.sum((X[:, None, :] - self.X_train_[None, :, :]) ** 2, axis=2)
+
+    def _predict_one(self, x0: np.ndarray, sq_dist: np.ndarray) -> tuple[float, float]:
         # Log-weights relative to the nearest point: no underflow at any bandwidth.
         log_w = -(sq_dist - sq_dist.min()) / (2 * self.bandwidth**2)
         idx = self._sample_neighbourhoods(log_w)
@@ -116,7 +119,8 @@ class ImprovedMCLLR(LocalRiskModel):
 
     def predict_with_uncertainty(self, X: np.ndarray):
         X = check_predict_inputs(X, self.n_features_)
-        out = np.array([self._predict_one(x0) for x0 in X]).reshape(-1, 2)
+        distances = self._query_distances(X)
+        out = np.array([self._predict_one(x0, d) for x0, d in zip(X, distances)]).reshape(-1, 2)
         return out[:, 0], out[:, 1]
 
     def predict(self, X: np.ndarray) -> np.ndarray:

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import NormalDist
@@ -25,11 +25,12 @@ from lrd.core.data.loader import load_fama_french
 from lrd.core.data.preprocessing import time_series_split
 from lrd.core.evaluation import metrics
 from lrd.core.evaluation.rolling import evaluate_walk_forward
-from lrd.core.evaluation.significance import diebold_mariano, oos_r2
+from lrd.core.evaluation.backtesting import economic_value, trailing_variance
+from lrd.core.evaluation.significance import clark_west, diebold_mariano, oos_r2
 from lrd.improved.config import ImprovedExperimentConfig, ImprovedModelConfig
 from lrd.improved.tuning import TunedModel
-from lrd.standard.config import ExperimentConfig, ModelCofig
-from lrd.standard.models.factory import Modelfactory
+from lrd.standard.config import ExperimentConfig, ModelConfig
+from lrd.standard.models.factory import ModelFactory
 
 DATA_PATH = "data/raw/F-F_Research_Data_5_Factors_2x3.csv"
 STANDARD_CONFIG = "experiments/standard/config_comparison.yaml"
@@ -56,7 +57,7 @@ class ModelSpec:
     build: Callable[[], LocalRiskModel] = field(repr=False, compare=False)
 
 
-def standard_spec(config: ModelCofig, key: Optional[str] = None) -> ModelSpec:
+def standard_spec(config: ModelConfig, key: Optional[str] = None) -> ModelSpec:
     params = {k: v for k, v in asdict(config).items() if v is not None and k != "model_type"}
     return ModelSpec(
         key=key or f"standard:{config.model_type}",
@@ -64,7 +65,7 @@ def standard_spec(config: ModelCofig, key: Optional[str] = None) -> ModelSpec:
         model_type=config.model_type,
         params=params,
         tuned=False,
-        build=lambda: Modelfactory.create(config),
+        build=lambda: ModelFactory.create(config),
     )
 
 
@@ -101,11 +102,39 @@ def improved_experiment(models: List[ImprovedModelConfig], base: Optional[Improv
     )
 
 
-def default_specs(standard_config: str = STANDARD_CONFIG, improved_config: str = IMPROVED_CONFIG) -> List[ModelSpec]:
-    """Every model of the default standard and improved configs."""
+def scaled_improved_experiment(base: ImprovedExperimentConfig, train_window: int = TRAIN_WINDOW,
+                               seed: Optional[int] = None) -> ImprovedExperimentConfig:
+    """The improved experiment for another training window and/or seed.
+
+    The inner tuning window (3/4 of the training window) and neighbourhood
+    sizes scale proportionally with the training window, so 240 months
+    reproduces the default configuration exactly.
+    """
+    ratio = train_window / base.train_window
+    inner = round(base.inner_train_window * ratio)
+    models = []
+    for m in base.models:
+        params = dict(m.params)
+        if "subsample_size" in params:
+            params["subsample_size"] = min(round(params["subsample_size"] * ratio), inner)
+        models.append(replace(m, params=params))
+    return replace(base, models=models, train_window=train_window, inner_train_window=inner,
+                   random_state=base.random_state if seed is None else seed)
+
+
+def default_specs(standard_config: str = STANDARD_CONFIG, improved_config: str = IMPROVED_CONFIG,
+                  seed: Optional[int] = None, train_window: int = TRAIN_WINDOW) -> List[ModelSpec]:
+    """Every model of the default standard and improved configs.
+
+    ``seed`` overrides the random seed of every stochastic model;
+    ``train_window`` rescales the improved models' tuning windows (see
+    ``scaled_improved_experiment``).
+    """
     standard = ExperimentConfig.from_yaml(standard_config)
-    improved = ImprovedExperimentConfig.from_yaml(improved_config)
-    return [standard_spec(m) for m in standard.models] + [improved_spec(m, improved) for m in improved.models]
+    standard_models = [m if seed is None or m.random_state is None else replace(m, random_state=seed)
+                       for m in standard.models]
+    improved = scaled_improved_experiment(ImprovedExperimentConfig.from_yaml(improved_config), train_window, seed)
+    return [standard_spec(m) for m in standard_models] + [improved_spec(m, improved) for m in improved.models]
 
 
 # ---------------------------------------------------------------------------
@@ -195,13 +224,17 @@ def run_holdout(
     )
 
 
-def compute_default_runs(progress: Callable[[str], None] = lambda _: None) -> List[ModelRun]:
-    """Walk-forward runs of every default model, on identical folds."""
+def compute_default_runs(progress: Callable[[str], None] = lambda _: None, seed: Optional[int] = None,
+                         train_window: int = TRAIN_WINDOW, test_window: int = TEST_WINDOW,
+                         keys: Optional[List[str]] = None) -> List[ModelRun]:
+    """Walk-forward runs of the default models (optionally only ``keys``), on identical folds."""
     X, y, dates = load_fama_french(DATA_PATH)
     runs = []
-    for spec in default_specs():
+    for spec in default_specs(seed=seed, train_window=train_window):
+        if keys is not None and spec.key not in keys:
+            continue
         progress(spec.key)
-        runs.append(run_model(spec, X, y, dates))
+        runs.append(run_model(spec, X, y, dates, train_window, test_window))
     return runs
 
 
@@ -222,18 +255,35 @@ def _check_aligned(run: ModelRun, benchmark: ModelRun) -> None:
         raise ValueError(f"{run.key} and {benchmark.key} were not evaluated on the same months.")
 
 
+RISK_AVERSION = 3.0
+
+
+def market_variance(dates: pd.DatetimeIndex, data_path: str = DATA_PATH) -> np.ndarray:
+    """Trailing 60-month variance of the market excess return known at each forecast month."""
+    X, _, all_dates = load_fama_french(data_path)
+    variance = trailing_variance(pd.Series(X[:, 0], index=all_dates))
+    return variance.reindex(dates).to_numpy()
+
+
 def stress_mask(y_true: np.ndarray) -> np.ndarray:
     """Months whose return is more than two standard deviations from the mean."""
     return np.abs(y_true - y_true.mean()) > 2 * y_true.std()
 
 
-def summarize(runs: List[ModelRun], benchmark: ModelRun) -> pd.DataFrame:
-    """One row per run: accuracy, significance vs benchmark, calibration, sub-periods, folds won."""
+def summarize(runs: List[ModelRun], benchmark: ModelRun, variance: Optional[np.ndarray] = None) -> pd.DataFrame:
+    """One row per run: accuracy, significance vs benchmark (Diebold-Mariano and
+    Clark-West), calibration, economic value, sub-periods and folds won.
+
+    ``variance`` is the investor's variance estimate per test month for the
+    economic evaluation; by default the trailing 60-month market variance.
+    """
     for run in runs:
         _check_aligned(run, benchmark)
     b = benchmark.errors
     pre = benchmark.dates < SPLIT_DATE
     stress = stress_mask(benchmark.y_true)
+    if variance is None:
+        variance = market_variance(benchmark.dates)
 
     fold_rmse = pd.DataFrame({r.key: r.folds["rmse"].to_numpy() for r in runs})
     wins = fold_rmse.idxmin(axis=1).value_counts() if len(runs) > 1 else pd.Series(dtype=int)
@@ -242,12 +292,16 @@ def summarize(runs: List[ModelRun], benchmark: ModelRun) -> pd.DataFrame:
     for run in runs:
         e = run.errors
         t_stat, p_value = diebold_mariano(e, b)
+        cw_t, cw_p = clark_west(e, b)
+        econ = economic_value(run.pred, benchmark.pred, run.y_true, variance, RISK_AVERSION)
         row = {
             "key": run.key, "system": run.system, "model_type": run.model_type,
             "rmse": metrics.rmse(run.y_true, run.pred),
             "mae": metrics.mae(run.y_true, run.pred),
             "oos_r2_%": 100 * oos_r2(e, b),
             "dm_t": t_stat, "dm_p": p_value,
+            "cw_t": cw_t, "cw_p": cw_p,
+            "cer_gain_%": econ["cer_gain_%"], "sharpe": econ["sharpe"], "mean_weight": econ["mean_weight"],
             "r2_pre2005_%": 100 * oos_r2(e[pre], b[pre]) if pre.any() else np.nan,
             "r2_post2005_%": 100 * oos_r2(e[~pre], b[~pre]) if (~pre).any() else np.nan,
             "r2_stress_%": 100 * oos_r2(e[stress], b[stress]) if stress.any() else np.nan,

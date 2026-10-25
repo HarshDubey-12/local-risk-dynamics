@@ -3,7 +3,34 @@
 import numpy as np
 import pytest
 
-from lrd.core.evaluation.significance import diebold_mariano, oos_r2
+from lrd.core.evaluation.significance import clark_west, diebold_mariano, oos_r2
+
+
+class TestClarkWest:
+    def test_identical_errors(self):
+        e = np.random.default_rng(0).normal(size=50)
+        assert clark_west(e, e) == (0.0, 0.5)
+
+    def test_better_model_is_significant(self):
+        rng = np.random.default_rng(0)
+        bench = rng.normal(0, 2.0, 500)
+        model = rng.normal(0, 1.0, 500)
+        t, p = clark_west(model, bench)
+        assert t > 0 and p < 0.01
+
+    def test_adjustment_favours_nested_model_relative_to_dm(self):
+        """With pure estimation noise, DM penalises the larger model; CW corrects for it."""
+        rng = np.random.default_rng(3)
+        y = rng.normal(0, 1, 400)
+        bench_err = y - 0.0
+        model_err = y - rng.normal(0, 0.3, 400)  # model adds noise around the benchmark
+        dm_t, _ = diebold_mariano(model_err, bench_err)
+        cw_t, _ = clark_west(model_err, bench_err)
+        assert cw_t > -dm_t
+
+    def test_shape_mismatch(self):
+        with pytest.raises(ValueError):
+            clark_west(np.zeros(3), np.zeros(4))
 
 
 class TestOosR2:

@@ -1,95 +1,93 @@
 """
-Data loader utilities
+Fama-French five-factor data loader.
 
-This module provides dataset loading functions for the research project.
-
-TODO:
- - Implement `load_fama_french()` to read `data/raw/F-F_Research_Data_5_Factors_2x3.csv`.
- - Add type hints and tests.
+Reads the monthly table of the Kenneth French Data Library file
+"F-F_Research_Data_5_Factors_2x3.csv" and builds a forecasting dataset:
+features are the five factor returns at month t, the target is a quantity
+of the market excess return at month t+1.
 """
 
-# placeholder: implementations should live here
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Tuple
 
-import numpy as np 
+import numpy as np
 import pandas as pd
 
-FACTOR_COLUMNS = ["Mkt-RF","SMB","HML","RMW","CMA"]
+FACTOR_COLUMNS = ["Mkt-RF", "SMB", "HML", "RMW", "CMA"]
 ALL_RETURN_COLUMNS = FACTOR_COLUMNS + ["RF"]
 
+# Forecast targets, all built from the market excess return at t+1.
+TARGETS = {
+    "return": "next-month market excess return",
+    "abs_return": "absolute next-month market excess return (a volatility proxy)",
+}
+
+
 def load_fama_french(
-        csv_path: str | Path,
-) -> Tuple[np.ndarray,np.ndarray,pd.DatetimeIndex]:
-     """
-    Load and preprocess the Fama–French Five-Factor dataset.
+    csv_path: str | Path,
+    target: str = "return",
+) -> Tuple[np.ndarray, np.ndarray, pd.DatetimeIndex]:
+    """
+    Load and preprocess the Fama-French five-factor dataset.
 
     Parameters
     ----------
     csv_path : str or Path
-        Path to the raw Fama–French CSV file.
+        Path to the raw Fama-French CSV file.
+    target : {"return", "abs_return"}, default="return"
+        ``"return"``: next-month market excess return.
+        ``"abs_return"``: its absolute value, a simple proxy for next-month
+        market volatility (risk forecasting).
 
     Returns
     -------
     X : np.ndarray of shape (n_samples, 5)
-        Feature matrix containing factor returns at time t.
-
+        Factor returns at month t (decimals).
     y : np.ndarray of shape (n_samples,)
-        Target vector containing next-period market excess return (t+1).
-
+        Target at month t+1.
     dates : pd.DatetimeIndex
-        Dates aligned with X and y after preprocessing.
+        Month t of each row.
 
     Notes
     -----
     - Returns are converted from percentages to decimals.
-    - Target is shifted by one period to ensure true forecasting.
-    - Final row is dropped due to NaN after shifting.
+    - The target is shifted by one month, so every row is a true forecast.
+    - The final month is dropped because it has no next-month target.
+    - Files with duplicated or out-of-order months are rejected.
     """
-     
-     csv_path = Path(csv_path)
+    if target not in TARGETS:
+        raise ValueError(f"Unknown target '{target}'. Expected one of: {sorted(TARGETS)}")
 
-     if not csv_path.exists():
-          raise FileNotFoundError(f"Fama-French file not found: {csv_path}")
-     
-     # Load CSV (skip metadata lines 0-3, header is on line 4)
-     # use skipinitialspace to trim leading spaces in numeric columns
-     df = pd.read_csv(csv_path, skiprows=4, skipinitialspace=True)
+    csv_path = Path(csv_path)
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Fama-French file not found: {csv_path}")
 
-     # Rename first column to 'Date' if unnamed 
-     if "Date" not in df.columns:
-          df = df.rename(columns = {df.columns[0]: "Date"})
+    # The header is on line 4 (after three note lines and a blank line);
+    # skipinitialspace trims the padding in numeric columns.
+    df = pd.read_csv(csv_path, skiprows=4, skipinitialspace=True)
+    if "Date" not in df.columns:
+        df = df.rename(columns={df.columns[0]: "Date"})
 
-     # Drop any extraneous metadata rows that sneaked in (e.g. repeated headers or notes)
-     # Keep only entries where the Date column looks like YYYYMM digits
-     df = df[df["Date"].astype(str).str.match(r"^\d{6}$")]
+    # Keep only the monthly table (YYYYMM); this drops the annual section and notes.
+    df = df[df["Date"].astype(str).str.match(r"^\d{6}$")]
+    df["Date"] = pd.to_datetime(df["Date"].astype(str), format="%Y%m")
 
-     # Parse dates (YYYYMM format)
-     df["Date"] = pd.to_datetime(df["Date"].astype(str), format="%Y%m")
+    # A duplicated or out-of-order month would silently corrupt the t -> t+1
+    # target alignment, so refuse to load such a file.
+    if df["Date"].duplicated().any() or not df["Date"].is_monotonic_increasing:
+        raise ValueError(
+            f"{csv_path} has duplicated or out-of-order months; "
+            "run lrd.core.data.validation.validate_fama_french for details."
+        )
 
-     # A duplicated or out-of-order month would silently corrupt the t -> t+1
-     # target alignment, so refuse to load such a file.
-     if df["Date"].duplicated().any() or not df["Date"].is_monotonic_increasing:
-          raise ValueError(
-               f"{csv_path} has duplicated or out-of-order months; "
-               "run lrd.core.data.validation.validate_fama_french for details."
-          )
+    # Percentage returns -> decimals
+    df[ALL_RETURN_COLUMNS] = df[ALL_RETURN_COLUMNS].apply(pd.to_numeric, errors="coerce") / 100.0
 
-     # Convert percentage returns -> decimals (ensure numeric type first)
-     df[ALL_RETURN_COLUMNS] = df[ALL_RETURN_COLUMNS].apply(pd.to_numeric, errors='coerce') / 100.0
+    X = df[FACTOR_COLUMNS].to_numpy(dtype=float)
+    next_month = df["Mkt-RF"].shift(-1).to_numpy(dtype=float)
+    y = np.abs(next_month) if target == "abs_return" else next_month
 
-     # Feature matrix at time t
-     X = df[FACTOR_COLUMNS].to_numpy(dtype = float)
-
-     # Target: next-period market excess return
-     y = df["Mkt-RF"].shift(-1).to_numpy(dtype = float)
-
-     # Remove last row (NaN after shift)
-     valid_mask = ~np.isnan(y)
-     X = X[valid_mask]
-     y = y[valid_mask]
-     dates = df.loc[valid_mask,"Date"]
-
-     return X, y, pd.DatetimeIndex(dates)
+    valid = ~np.isnan(y)
+    return X[valid], y[valid], pd.DatetimeIndex(df.loc[valid, "Date"])

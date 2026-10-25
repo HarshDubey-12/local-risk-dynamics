@@ -32,9 +32,18 @@ def small_config(**overrides):
 class TestModelConfig:
     def test_default_yaml_loads(self):
         config = ImprovedExperimentConfig.from_yaml(DEFAULT_CONFIG)
-        assert [m.name for m in config.models] == ["historical_mean", "ridge", "mcllr_improved"]
+        assert [m.name for m in config.models] == ["historical_mean", "ridge", "mcllr_improved", "mcllr_regime"]
         assert config.benchmark == "historical_mean"
         assert config.strict_validation is True
+        assert config.target == "return"
+
+    def test_risk_yaml_loads(self):
+        config = ImprovedExperimentConfig.from_yaml("experiments/improved/config_risk.yaml")
+        assert config.target == "abs_return"
+
+    def test_invalid_target(self):
+        with pytest.raises(ValueError, match="Unknown target"):
+            small_config(target="volume")
 
     @pytest.mark.parametrize(
         "kwargs, match",
@@ -98,6 +107,16 @@ class TestPipeline:
         assert summary.loc["historical_mean", "oos_r2_%"] == 0.0
         assert summary[["rmse", "coverage_95", "gaussian_nll"]].notna().all().all()
         assert (summary["coverage_95"] > 0.8).all()  # every improved model is roughly calibrated
+        # Clark-West and economic value for the return target
+        assert summary[["cw_p_vs_historical_mean", "cer_gain_%", "sharpe"]].notna().all().all()
+        assert summary.loc["historical_mean", "cer_gain_%"] == pytest.approx(0.0)
+
+    def test_risk_target_pipeline(self):
+        config = small_config(target="abs_return")
+        results = ImprovedPipeline(config).run(log=lambda _: None)
+        assert (results.predictions["y_true"] >= 0).all()
+        assert "cer_gain_%" not in results.summary  # market timing only applies to return forecasts
+        assert results.summary["rmse"].notna().all()
 
     def test_all_models_share_test_months(self, results):
         n = len(load_fama_french(DATA_PATH)[1])

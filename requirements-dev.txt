@@ -1,0 +1,6 @@
+# Development: tests and notebooks. Install with: pip install -r requirements-dev.txt
+-r requirements.txt
+pytest==8.0.2
+notebook>=7,<8
+nbconvert>=7,<8
+ipykernel>=6,<8

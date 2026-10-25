@@ -7,7 +7,7 @@ import pytest
 from lrd import comparison as cmp
 from lrd.core.data.loader import load_fama_french
 from lrd.improved.config import ImprovedModelConfig
-from lrd.standard.config import ModelCofig
+from lrd.standard.config import ModelConfig
 
 TRAIN, TEST = 600, 48
 
@@ -24,8 +24,8 @@ def runs(data):
         ImprovedModelConfig("ridge", "ridge", ["standardize"], grid={"alpha": [0.1, 10.0]}),
     ])
     specs = [
-        cmp.standard_spec(ModelCofig(model_type="global_linear")),
-        cmp.standard_spec(ModelCofig(model_type="mc_linear", n_simulations=10, subsample_size=60, random_state=0)),
+        cmp.standard_spec(ModelConfig(model_type="global_linear")),
+        cmp.standard_spec(ModelConfig(model_type="mc_linear", n_simulations=10, subsample_size=60, random_state=0)),
         cmp.improved_spec(experiment.models[0], experiment),  # historical-mean benchmark
         cmp.improved_spec(experiment.models[1], experiment),
     ]
@@ -34,7 +34,8 @@ def runs(data):
 
 def test_default_specs_cover_both_systems():
     keys = [s.key for s in cmp.default_specs()]
-    assert len(keys) == 10 and len(set(keys)) == 10
+    assert len(keys) == 11 and len(set(keys)) == 11
+    assert "improved:mcllr_regime" in keys
     assert cmp.BENCHMARK_KEY in keys
     assert sum(k.startswith("standard:") for k in keys) == 7
 
@@ -68,11 +69,39 @@ def test_summarize(runs):
     assert (np.diff(cov) >= 0).all()
     assert np.isnan(summary.loc["standard:global_linear", "coverage_95"])
     assert summary["rmse"].notna().all()
+    # Clark-West and economic value are reported for every model
+    assert summary[["cw_t", "cw_p", "cer_gain_%", "sharpe", "mean_weight"]].notna().all().all()
+    assert summary.loc[cmp.BENCHMARK_KEY, "cer_gain_%"] == pytest.approx(0.0)
+
+
+def test_default_specs_seed_override():
+    specs = {s.key: s for s in cmp.default_specs(seed=7)}
+    assert specs["standard:mcllr"].build().random_state == 7
+    improved = specs["improved:mcllr_improved"].build()
+    assert improved.builder({"bandwidth": 1.0, "alpha": 1.0}).model.random_state == 7
+
+
+def test_scaled_improved_experiment():
+    from lrd.improved.config import ImprovedExperimentConfig
+
+    base = ImprovedExperimentConfig.from_yaml(cmp.IMPROVED_CONFIG)
+    same = cmp.scaled_improved_experiment(base, 240)
+    assert same.inner_train_window == base.inner_train_window
+    assert [m.params for m in same.models] == [m.params for m in base.models]
+    short = cmp.scaled_improved_experiment(base, 120)
+    assert short.train_window == 120 and short.inner_train_window == 90
+    sizes = [m.params["subsample_size"] for m in short.models if "subsample_size" in m.params]
+    assert sizes and all(s <= 90 for s in sizes)
+
+
+def test_compute_default_runs_key_filter():
+    runs = cmp.compute_default_runs(keys=[cmp.BENCHMARK_KEY], train_window=600, test_window=48)
+    assert [r.key for r in runs] == [cmp.BENCHMARK_KEY]
 
 
 def test_misaligned_runs_rejected(runs, data):
     X, y, dates = data
-    short = cmp.run_model(cmp.standard_spec(ModelCofig(model_type="global_linear")), X, y, dates, 500, 48)
+    short = cmp.run_model(cmp.standard_spec(ModelConfig(model_type="global_linear")), X, y, dates, 500, 48)
     with pytest.raises(ValueError, match="same months"):
         cmp.summarize([short], runs[cmp.BENCHMARK_KEY])
 
@@ -92,7 +121,7 @@ def test_cumulative_advantage_matches_sse(runs):
 
 def test_holdout(data):
     X, y, dates = data
-    run = cmp.run_holdout(cmp.standard_spec(ModelCofig(model_type="ridge_linear", alpha=1.0)), X, y, dates)
+    run = cmp.run_holdout(cmp.standard_spec(ModelConfig(model_type="ridge_linear", alpha=1.0)), X, y, dates)
     assert run.protocol == "holdout"
     assert len(run.pred) == len(y) - int(len(y) * 0.8)
     assert len(run.folds) == 1

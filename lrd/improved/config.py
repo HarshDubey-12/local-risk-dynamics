@@ -25,6 +25,7 @@ from typing import Any, Dict, List
 import yaml
 
 from lrd.core.base import LocalRiskModel
+from lrd.core.data.loader import TARGETS
 from lrd.improved.models import MODEL_REGISTRY, STOCHASTIC_MODELS
 from lrd.improved.preprocessing import PreparedModel, build_transformer
 from lrd.improved.tuning import TunedModel, expand_grid
@@ -82,6 +83,7 @@ class ImprovedExperimentConfig:
     dataset_path: str
     models: List[ImprovedModelConfig]
     benchmark: str = "historical_mean"
+    target: str = "return"  # "return" or "abs_return" (volatility proxy); see lrd.core.data.loader
     random_state: int = 42
     train_window: int = 240
     test_window: int = 12
@@ -99,6 +101,8 @@ class ImprovedExperimentConfig:
             raise ValueError(f"Model names must be unique: {names}")
         if self.benchmark not in names:
             raise ValueError(f"benchmark '{self.benchmark}' must be one of the model names {names}.")
+        if self.target not in TARGETS:
+            raise ValueError(f"Unknown target '{self.target}'. Expected one of: {sorted(TARGETS)}")
         for label, value in [("train_window", self.train_window), ("test_window", self.test_window),
                              ("inner_train_window", self.inner_train_window),
                              ("inner_test_window", self.inner_test_window)]:

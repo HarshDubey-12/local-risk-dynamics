@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from lrd.standard.config import ExperimentConfig, ModelCofig
-from lrd.standard.models.factory import Modelfactory
+from lrd.standard.config import ExperimentConfig, ModelConfig
+from lrd.standard.models.factory import ModelFactory
 
 DATA_PATH = "data/raw/F-F_Research_Data_5_Factors_2x3.csv"
 
@@ -22,11 +22,11 @@ class TestConfigValidation:
     )
     def test_missing_required_params(self, kwargs, missing):
         with pytest.raises(ValueError, match=missing):
-            ModelCofig(**kwargs)
+            ModelConfig(**kwargs)
 
     def test_unknown_model_type(self):
         with pytest.raises(ValueError, match="Unknown model_type"):
-            ModelCofig(model_type="foo")
+            ModelConfig(model_type="foo")
 
     @pytest.mark.parametrize(
         "kwargs",
@@ -39,7 +39,7 @@ class TestConfigValidation:
     )
     def test_invalid_values(self, kwargs):
         with pytest.raises(ValueError):
-            ModelCofig(**kwargs)
+            ModelConfig(**kwargs)
 
     def test_missing_experiment_keys(self, tmp_path):
         path = tmp_path / "bad.yaml"
@@ -52,7 +52,7 @@ class TestConfigValidation:
             ExperimentConfig(
                 dataset_path=DATA_PATH,
                 train_ratio=1.5,
-                models=[ModelCofig(model_type="global_linear")],
+                models=[ModelConfig(model_type="global_linear")],
             )
 
     def test_experiment_seed_propagates_to_models(self):
@@ -61,8 +61,8 @@ class TestConfigValidation:
             train_ratio=0.8,
             random_state=7,
             models=[
-                ModelCofig(model_type="mc_linear", n_simulations=5, subsample_size=10),
-                ModelCofig(
+                ModelConfig(model_type="mc_linear", n_simulations=5, subsample_size=10),
+                ModelConfig(
                     model_type="mc_linear", n_simulations=5, subsample_size=10, random_state=3
                 ),
             ],
@@ -75,4 +75,4 @@ class TestConfigValidation:
     def test_all_shipped_configs_build_models(self, config_path):
         config = ExperimentConfig.from_yaml(config_path)
         for model_config in config.models:
-            assert Modelfactory.create(model_config) is not None
+            assert ModelFactory.create(model_config) is not None

@@ -93,10 +93,10 @@ def test_custom_improved_fixed_run():
 
 def test_comparison_includes_custom_runs():
     from lrd.core.data.loader import load_fama_french
-    from lrd.standard.config import ModelCofig
+    from lrd.standard.config import ModelConfig
 
     X, y, dates = load_fama_french(cmp.DATA_PATH)
-    run = cmp.run_model(cmp.standard_spec(ModelCofig(model_type="ridge_linear", alpha=0.1), key="standard:ridge_linear#test"),
+    run = cmp.run_model(cmp.standard_spec(ModelConfig(model_type="ridge_linear", alpha=0.1), key="standard:ridge_linear#test"),
                         X, y, dates)
     at = _run("comparison", {"custom_runs": {run.key: (run, "Ridge custom α=0.1")}})
     assert "standard:ridge_linear#test" in at.multiselect[0].value

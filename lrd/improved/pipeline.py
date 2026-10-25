@@ -20,8 +20,9 @@ import pandas as pd
 from lrd.core.data.loader import load_fama_french
 from lrd.core.data.validation import ValidationReport, validate_fama_french
 from lrd.core.evaluation import metrics
+from lrd.core.evaluation.backtesting import economic_value, trailing_variance
 from lrd.core.evaluation.rolling import evaluate_walk_forward, rolling_results_to_frame
-from lrd.core.evaluation.significance import diebold_mariano, oos_r2
+from lrd.core.evaluation.significance import clark_west, diebold_mariano, oos_r2
 from lrd.improved.config import ImprovedExperimentConfig
 from lrd.improved.tuning import TunedModel
 
@@ -69,7 +70,7 @@ class ImprovedPipeline:
             report.raise_if_invalid()
 
         # 2. Load once; folds are shared by every model.
-        X, y, dates = load_fama_french(cfg.dataset_path)
+        X, y, dates = load_fama_french(cfg.dataset_path, target=cfg.target)
 
         fold_frames, tuning_rows = [], []
         predictions: pd.DataFrame | None = None
@@ -116,12 +117,17 @@ class ImprovedPipeline:
         # 4. Shared evaluation over all test months, against the benchmark.
         y_true = predictions["y_true"].to_numpy()
         bench = errors[cfg.benchmark]
+        bench_pred = y_true - bench
+        variance = None
+        if cfg.target == "return":  # market timing only makes sense for return forecasts
+            variance = trailing_variance(pd.Series(X[:, 0], index=dates)).reindex(predictions["date"]).to_numpy()
         rows = []
         for model_cfg in cfg.models:
             name, e, s = model_cfg.name, errors[model_cfg.name], stds[model_cfg.name]
             pred = y_true - e
             t_stat, p_value = diebold_mariano(e, bench)
-            rows.append({
+            cw_t, cw_p = clark_west(e, bench)
+            row = {
                 "model": name,
                 "rmse": metrics.rmse(y_true, pred),
                 "mae": metrics.mae(y_true, pred),
@@ -132,7 +138,13 @@ class ImprovedPipeline:
                 "interval_score_95": metrics.interval_score_95(y_true, pred, s),
                 f"dm_t_vs_{cfg.benchmark}": t_stat,
                 f"dm_p_vs_{cfg.benchmark}": p_value,
-            })
+                f"cw_t_vs_{cfg.benchmark}": cw_t,
+                f"cw_p_vs_{cfg.benchmark}": cw_p,
+            }
+            if variance is not None:
+                econ = economic_value(pred, bench_pred, y_true, variance)
+                row.update({"cer_gain_%": econ["cer_gain_%"], "sharpe": econ["sharpe"]})
+            rows.append(row)
 
         return ImprovedResults(
             validation=report,

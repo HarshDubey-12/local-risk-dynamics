@@ -15,7 +15,7 @@ from lrd import comparison as cmp
 from lrd.core.data.loader import load_fama_french
 from lrd.core.data.validation import ValidationReport, validate_fama_french
 from lrd.improved.config import ImprovedModelConfig
-from lrd.standard.config import ModelCofig
+from lrd.standard.config import ModelConfig
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUN_DIR = PROJECT_ROOT / "app" / "data" / "default_run"
@@ -51,10 +51,13 @@ def validation(threshold: float = 5.0) -> ValidationReport:
 
 @st.cache_resource(show_spinner="Running every model on the shared folds (about a minute, once)…")
 def default_runs() -> dict[str, cmp.ModelRun]:
-    """Precomputed default runs; recomputed if missing or built from different data."""
+    """Precomputed default runs; recomputed if missing, built from different data,
+    or not covering every model of the current default configs."""
     try:
         runs, meta = cmp.load_runs(DEFAULT_RUN_DIR)
-        if meta.get("data_hash") == cmp.data_hash() and meta.get("train_window") == cmp.TRAIN_WINDOW:
+        current = (meta.get("data_hash") == cmp.data_hash() and meta.get("train_window") == cmp.TRAIN_WINDOW
+                   and {r.key for r in runs} == {s.key for s in cmp.default_specs()})
+        if current:
             return {r.key: r for r in runs}
     except FileNotFoundError:
         pass
@@ -80,7 +83,7 @@ def custom_run(
     params, grid = json.loads(params_json), json.loads(grid_json)
     key = custom_key(system, model_type, params_json, tuned, grid_json, protocol)
     if system == "standard":
-        spec = cmp.standard_spec(ModelCofig(model_type=model_type, random_state=SEED, **params), key=key)
+        spec = cmp.standard_spec(ModelConfig(model_type=model_type, random_state=SEED, **params), key=key)
     else:
         preprocessing = [] if model_type == "historical_mean" else ["standardize"]
         model_cfg = ImprovedModelConfig(name=model_type, model_type=model_type, preprocessing=preprocessing,

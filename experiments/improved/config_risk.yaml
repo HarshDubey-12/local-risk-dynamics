@@ -1,0 +1,56 @@
+# Risk forecasting: predict next month's ABSOLUTE market excess return, a simple
+# proxy for next-month volatility. Run with:
+#   python main.py --system improved --improved-config experiments/improved/config_risk.yaml
+#
+# Volatility clusters in regimes, so this is where locality should matter most.
+# Linear global models cannot use the size of this month's return (|r_t|) because
+# they are linear in the signed factors; local models can, through the kernel.
+dataset_path: data/raw/F-F_Research_Data_5_Factors_2x3.csv
+target: abs_return
+random_state: 42
+benchmark: historical_mean
+
+evaluation:
+  train_window: 240
+  test_window: 12
+
+tuning:
+  inner_train_window: 180
+  inner_test_window: 12
+
+validation:
+  strict: true
+  outlier_threshold: 5.0
+
+models:
+  - name: historical_mean
+    model_type: historical_mean
+
+  - name: ridge
+    model_type: ridge
+    preprocessing: [standardize]
+    grid:
+      alpha: [0.1, 1.0, 3.0, 10.0, 30.0]
+
+  - name: mcllr_improved
+    model_type: mcllr_improved
+    preprocessing: [standardize]
+    params:
+      n_simulations: 50
+      subsample_size: 160
+      predictive_std: true
+    grid:
+      bandwidth: [1.0, 2.0, 3.0]
+      alpha: [1.0, 3.0, 10.0, 30.0]
+
+  - name: mcllr_regime
+    model_type: mcllr_regime
+    preprocessing: [standardize]
+    params:
+      n_simulations: 50
+      subsample_size: 160
+      predictive_std: true
+      state_window: 12
+    grid:
+      bandwidth: [0.5, 1.0, 2.0]
+      alpha: [1.0, 10.0, 30.0]

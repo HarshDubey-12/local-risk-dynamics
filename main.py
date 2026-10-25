@@ -62,8 +62,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_CONFIG = str(PROJECT_ROOT / "experiments" / "standard" / "config_comparison.yaml")
 DEFAULT_IMPROVED_CONFIG = str(PROJECT_ROOT / "experiments" / "improved" / "config_improved.yaml")
 SUMMARY_COLUMNS = ["model", "rmse", "mae", "r2", "coverage_95", "interval_width_95"]
-IMPROVED_COLUMNS = ["model", "rmse", "mae", "oos_r2_%", "coverage_95", "interval_score_95",
-                    "dm_p_vs_historical_mean"]
+IMPROVED_COLUMNS = ["model", "rmse", "oos_r2_%", "cw_p_vs_historical_mean", "dm_p_vs_historical_mean",
+                    "coverage_95", "interval_score_95", "cer_gain_%", "sharpe"]
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:

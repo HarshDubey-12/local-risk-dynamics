@@ -111,6 +111,10 @@ python main.py --system both --rolling      # standard and improved in one run
 | `lrd/improved/models/benchmark.py` | `HistoricalMean`: the benchmark every model must beat |
 | `lrd/improved/models/ridge.py` | `RidgeRegression` with residual-based predictive std |
 | `lrd/improved/models/mcllr.py` | `ImprovedMCLLR`: local ridge, Gumbel top-k sampling, batched fits, predictive std |
+| `lrd/improved/models/regime.py` | `RegimeMCLLR`: kernel on the market regime (trailing 12-month volatility and momentum) |
+| `experiments/improved/config_risk.yaml` | Risk-forecasting experiment: target = absolute next-month return |
+| `lrd/core/evaluation/backtesting.py` | Portfolio statistics (√12 annualisation) and market-timing economic value |
+| `lrd/core/evaluation/significance.py` | OOS R², Diebold–Mariano and Clark–West tests |
 | `lrd/improved/tuning.py` | `TunedModel`: nested walk-forward hyperparameter selection |
 | `lrd/improved/config.py` | YAML schema, validation and model construction |
 | `lrd/improved/pipeline.py` | `ImprovedPipeline` and `ImprovedResults` |
@@ -122,13 +126,14 @@ python main.py --system both --rolling      # standard and improved in one run
 ```yaml
 dataset_path: data/raw/F-F_Research_Data_5_Factors_2x3.csv
 random_state: 42
-benchmark: historical_mean          # OOS R² and DM tests are relative to this model
+benchmark: historical_mean          # OOS R², DM and CW tests are relative to this model
+target: return                      # or abs_return (|next-month return|, a volatility proxy)
 evaluation: {train_window: 240, test_window: 12}
 tuning: {inner_train_window: 180, inner_test_window: 12}
 validation: {strict: true, outlier_threshold: 5.0}
 models:
   - name: mcllr_improved            # unique label used in outputs
-    model_type: mcllr_improved      # historical_mean | ridge | mcllr_improved
+    model_type: mcllr_improved      # historical_mean | ridge | mcllr_improved | mcllr_regime
     preprocessing: [standardize]    # or {winsorize: 0.01}
     params: {n_simulations: 50, subsample_size: 160}   # fixed
     grid: {bandwidth: [1, 2, 3], alpha: [1, 3, 10, 30]} # tuned per fold
